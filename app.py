@@ -5,23 +5,16 @@ import uuid
 from flask import Flask, render_template, request, jsonify, session, redirect
 
 app = Flask(__name__)
-# O segredo agora vem do ambiente ou de um fallback seguro
-app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'kenji_nexus_ultra_secret')
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'kenji_nexus_final_boss')
 
 # ==========================================
-# ⚙️ CONFIGURAÇÕES DE API (MODO SEGURO)
+# ⚙️ CONFIGURAÇÃO DE AMBIENTE
 # ==========================================
-SENHA_MESTRA = "32442356" 
+SENHA_MESTRA = "1234" 
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
-# No GitHub/Render, você vai configurar uma variável chamada GROQ_API_KEY
-# Se estiver testando local, ele tenta pegar a chave; se não achar, avisa no chat.
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "COLOQUE_SUA_CHAVE_AQUI_PARA_TESTE_LOCAL")
-
-# ==========================================
-# 🗄️ BANCO DE DADOS
-# ==========================================
 def get_db():
-    # Caminho adaptável para Nuvem ou Local
+    # Isso garante que o banco funcione tanto no Render quanto no Kali
     db_path = os.path.join(os.getcwd(), 'memoria_nexus.db')
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -34,30 +27,35 @@ def init_db():
         conn.commit()
 init_db()
 
+# ==========================================
+# 🧠 MOTOR TÁTICO
+# ==========================================
 class KenjiEngine:
     @staticmethod
     def generate_text(prompt, history):
+        if not GROQ_API_KEY:
+            return "❌ ERRO: Chave API não configurada no Render (Environment Variables)."
+            
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
         
-        system_msg = {
-            "role": "system", 
-            "content": "Você é o Kenji Nexus, IA tática criada por @cybernmap. Responda de forma fria, técnica e objetiva. Use blocos de código markdown para comandos."
-        }
+        system_msg = {"role": "system", "content": "Você é o Kenji Nexus, IA de elite de @cybernmap. Seja direto, técnico e use blocos de código."}
         
         payload = {
             "model": "llama-3.3-70b-versatile", 
             "messages": [system_msg] + history + [{"role": "user", "content": prompt}], 
-            "temperature": 0.5
+            "temperature": 0.6
         }
         
         try:
-            res = requests.post(url, headers=headers, json=payload, timeout=20)
-            res.raise_for_status()
+            res = requests.post(url, headers=headers, json=payload, timeout=25)
             return res.json()['choices'][0]['message']['content']
         except Exception as e:
-            return f"❌ Erro de Sistema: {str(e)}. Verifique se a chave GROQ_API_KEY foi configurada nas variáveis de ambiente."
+            return f"❌ Falha na conexão com a Groq: {str(e)}"
 
+# ==========================================
+# 🛣️ ROTAS (FIX DE ATUALIZAÇÃO)
+# ==========================================
 @app.route("/")
 def index():
     if not session.get("authorized"): return render_template("login.html")
@@ -70,31 +68,25 @@ def login():
         return jsonify({"status": "success"})
     return jsonify({"status": "denied"}), 401
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/")
-
 @app.route("/chat", methods=["POST"])
 def chat():
     if not session.get("authorized"): return jsonify({"error": "Unauthorized"}), 403
     data = request.json
-    user_msg = data.get("mensagem", "")
+    user_msg = data.get("mensagem", "").strip()
     conversa_id = data.get("conversa_id")
 
     with get_db() as conn:
-        # Pega as últimas mensagens para contexto
         cur = conn.execute("SELECT role, content FROM mensagens WHERE conversa_id = ? ORDER BY id DESC LIMIT 6", (conversa_id,))
         history = [{"role": r["role"], "content": r["content"]} for r in cur.fetchall()][::-1]
 
-    response = KenjiEngine.generate_text(user_msg, history)
+    response_text = KenjiEngine.generate_text(user_msg, history)
 
     with get_db() as conn:
         conn.execute("INSERT INTO mensagens (conversa_id, role, content) VALUES (?, ?, ?)", (conversa_id, "user", user_msg))
-        conn.execute("INSERT INTO mensagens (conversa_id, role, content) VALUES (?, ?, ?)", (conversa_id, "assistant", response))
+        conn.execute("INSERT INTO mensagens (conversa_id, role, content) VALUES (?, ?, ?)", (conversa_id, "assistant", response_text))
         conn.commit()
 
-    return jsonify({"resposta": response})
+    return jsonify({"resposta": response_text})
 
 @app.route("/carregar_conversas")
 def carregar_conversas():
@@ -116,5 +108,7 @@ def nova_conversa():
         conn.commit()
     return jsonify({"id": new_id})
 
+# CONFIGURAÇÃO DE PORTA DINÂMICA PARA O RENDER
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
