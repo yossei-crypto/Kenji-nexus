@@ -3,175 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kenji IA | Autenticação</title>
+    <title>Kenji IA | Login</title>
     <style>
-        :root { --accent: #00e5ff; --bg: #050505; }
-        
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'JetBrains Mono', monospace; }
-        
-        body { 
-            background: var(--bg); 
-            height: 100dvh; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            overflow: hidden;
-            color: var(--accent);
-        }
-
-        /* EFEITO DE LINHAS DE VARREDURA (SCANLINES) */
-        body::before {
-            content: " ";
-            position: absolute; inset: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 4px, 3px 100%;
-            pointer-events: none; z-index: 10;
-        }
-
-        .login-card {
-            width: 90%; max-width: 350px;
-            padding: 40px 30px;
-            background: rgba(10, 10, 10, 0.9);
-            border: 1px solid var(--accent);
-            border-radius: 4px;
-            text-align: center;
-            box-shadow: 0 0 30px rgba(0, 229, 255, 0.1);
-            z-index: 20;
-            animation: emerge 1s ease-out;
-        }
-
-        @keyframes emerge {
-            from { opacity: 0; transform: scale(0.9); }
-            to { opacity: 1; transform: scale(1); }
-        }
-
-        /* GLITCH DO NOME KENJI IA */
-        .glitch-title {
-            font-size: 1.8rem;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 5px;
-            margin-bottom: 30px;
-            position: relative;
-        }
-
-        .glitch-title::after {
-            content: "KENJI IA";
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: var(--bg);
-            clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%);
-            animation: glitch 2s infinite;
-        }
-
-        @keyframes glitch {
-            0% { transform: translate(0); }
-            20% { transform: translate(-3px, 3px); }
-            40% { transform: translate(-3px, -3px); }
-            60% { transform: translate(3px, 3px); }
-            80% { transform: translate(3px, -3px); }
-            100% { transform: translate(0); }
-        }
-
-        input {
-            width: 100%;
-            padding: 15px;
-            background: #000;
-            border: 1px solid #222;
-            color: #fff;
-            margin-bottom: 20px;
-            outline: none;
-            text-align: center;
-            font-size: 1rem;
-            transition: 0.3s;
-        }
-
-        input:focus { border-color: var(--accent); box-shadow: 0 0 10px rgba(0, 229, 255, 0.2); }
-
-        button {
-            width: 100%;
-            padding: 15px;
-            background: var(--accent);
-            color: #000;
-            border: none;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-
-        button:hover { background: #fff; transform: translateY(-2px); }
-
-        .footer-tag {
-            margin-top: 30px;
-            font-size: 0.7rem;
-            opacity: 0.4;
-            letter-spacing: 2px;
-        }
-
-        /* STATUS DE ÁUDIO */
-        #audio-status {
-            position: fixed; bottom: 20px; font-size: 0.6rem; opacity: 0.3;
-        }
+        body { background: #000; margin: 0; height: 100dvh; display: flex; align-items: center; justify-content: center; overflow: hidden; font-family: monospace; }
+        canvas { position: absolute; top: 0; left: 0; opacity: 0.4; }
+        .card { position: relative; z-index: 10; background: rgba(0,0,0,0.9); border: 1px solid #00e5ff; padding: 40px; text-align: center; width: 85%; max-width: 350px; box-shadow: 0 0 20px #00e5ff44; }
+        h1 { color: #00e5ff; letter-spacing: 5px; margin-bottom: 30px; font-size: 1.5rem; }
+        input { width: 100%; padding: 15px; background: #000; border: 1px solid #333; color: #fff; margin-bottom: 20px; outline: none; text-align: center; }
+        button { width: 100%; padding: 15px; background: #00e5ff; color: #000; border: none; font-weight: bold; cursor: pointer; }
     </style>
 </head>
-<body onclick="playMatrixMusic()">
-
-    <div class="login-card">
-        <div class="glitch-title">Kenji IA</div>
-        
-        <input type="password" id="pass" placeholder="PASSWORD" autocomplete="current-password">
-        <button onclick="login()">Acessar Sistema</button>
-        
-        <div class="footer-tag">@cybernmap | ENCRYPTION ACTIVE</div>
+<body onclick="document.getElementById('m').play()">
+    <canvas id="mtx"></canvas>
+    <div class="card">
+        <h1>KENJI IA</h1>
+        <input type="password" id="p" placeholder="SENHA MESTRA">
+        <button onclick="l()">ACESSAR</button>
     </div>
-
-    <div id="audio-status">AUDIO SYSTEM: WAITING INTERACTION</div>
-
-    <audio id="bg-music" loop>
-        <source src="/static/musica.mp3" type="audio/mpeg">
-    </audio>
-
+    <audio id="m" loop><source src="/static/musica.mp3" type="audio/mpeg"></audio>
     <script>
-        let audioStarted = false;
-
-        function playMatrixMusic() {
-            const music = document.getElementById('bg-music');
-            const status = document.getElementById('audio-status');
-            if (!audioStarted) {
-                music.play().then(() => {
-                    audioStarted = true;
-                    status.innerText = "AUDIO SYSTEM: ONLINE";
-                    status.style.color = "#00e5ff";
-                }).catch(e => console.log("Aguardando interação..."));
-            }
-        }
-
-        async function login() {
-            const senha = document.getElementById('pass').value;
-            const res = await fetch('/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ senha: senha })
+        const c = document.getElementById('mtx'), ctx = c.getContext('2d');
+        c.width = window.innerWidth; c.height = window.innerHeight;
+        const s = 16, cols = c.width / s, d = Array(Math.floor(cols)).fill(1);
+        function draw() {
+            ctx.fillStyle = "rgba(0,0,0,0.05)"; ctx.fillRect(0,0,c.width,c.height);
+            ctx.fillStyle = "#00e5ff"; ctx.font = s + "px monospace";
+            d.forEach((y, i) => {
+                ctx.fillText(String.fromCharCode(Math.random() * 128), i * s, y * s);
+                if (y * s > c.height && Math.random() > 0.975) d[i] = 0; d[i]++;
             });
-
-            if (res.ok) {
-                window.location.href = '/';
-            } else {
-                alert('ACESSO NEGADO, OPERADOR.');
-                document.getElementById('pass').value = '';
-            }
         }
-
-        // Tentar tocar ao pressionar Enter no input também
-        document.getElementById('pass').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                playMatrixMusic();
-                login();
-            }
-        });
+        setInterval(draw, 50);
+        async function l() {
+            const p = document.getElementById('p').value;
+            const res = await fetch('/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({senha:p})});
+            if(res.ok) window.location.href='/'; else alert('NEGADO');
+        }
     </script>
 </body>
 </html>
