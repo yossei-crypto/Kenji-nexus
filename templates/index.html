@@ -646,4 +646,273 @@
         });
 
         // ── Sidebar Toggle (mobile) ─────────────────
-        function toggleSideba
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('sidebarOverlay').classList.toggle('open');
+        }
+
+        // ── Conversas ───────────────────────────────
+        async function carregarConversas() {
+            try {
+                const res = await fetch('/carregar_conversas');
+                const data = await res.json();
+                renderConversas(data);
+            } catch (e) {
+                console.error('Erro ao carregar conversas:', e);
+            }
+        }
+
+        function renderConversas(lista) {
+            const el = document.getElementById('convList');
+            if (!lista.length) {
+                el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.78rem;">Nenhuma conversa ainda</div>';
+                return;
+            }
+            el.innerHTML = lista.map(c => `
+                <div class="conv-item ${c.id === conversaAtual ? 'active' : ''}"
+                     onclick="abrirConversa('${c.id}', '${escapeHtml(c.titulo)}')">
+                    <span class="conv-title">${escapeHtml(c.titulo)}</span>
+                    <div class="conv-actions">
+                        <button class="conv-action-btn" onclick="event.stopPropagation();openRenameModal('${c.id}','${escapeAttr(c.titulo)}')" title="Renomear">&#9998;</button>
+                        <button class="conv-action-btn delete" onclick="event.stopPropagation();excluirConversa('${c.id}')" title="Excluir">&#10005;</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function novaConversa() {
+            try {
+                const res = await fetch('/nova_conversa', { method: 'POST' });
+                const data = await res.json();
+                await carregarConversas();
+                abrirConversa(data.id, data.titulo);
+                toggleSidebar(); // fecha no mobile
+            } catch (e) {
+                console.error('Erro ao criar conversa:', e);
+            }
+        }
+
+        async function abrirConversa(id, titulo) {
+            conversaAtual = id;
+            document.getElementById('chatTitle').textContent = titulo;
+            document.getElementById('msgInput').disabled = false;
+            document.getElementById('btnSend').disabled = false;
+            document.getElementById('welcomeMsg')?.remove();
+
+            // Atualizar sidebar
+            document.querySelectorAll('.conv-item').forEach(el => {
+                el.classList.toggle('active', el.onclick.toString().includes(id));
+            });
+
+            // Carregar histórico
+            const messagesEl = document.getElementById('messages');
+            messagesEl.innerHTML = '';
+
+            try {
+                const res = await fetch(`/carregar_historico/${id}`);
+                const msgs = await res.json();
+                msgs.forEach(m => appendMessage(m.role, m.content, m.criado_em));
+                scrollToBottom();
+            } catch (e) {
+                console.error('Erro ao carregar histórico:', e);
+            }
+
+            // Re-highlight sidebar
+            await carregarConversas();
+            document.getElementById('msgInput').focus();
+        }
+
+        async function excluirConversa(id) {
+            if (!confirm('Excluir esta conversa permanentemente?')) return;
+            try {
+                await fetch('/excluir_conversa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+                if (conversaAtual === id) {
+                    conversaAtual = null;
+                    document.getElementById('messages').innerHTML =
+                        '<div class="welcome-msg" id="welcomeMsg"><h2>// Bem-vindo ao Kenji IA</h2><p>Crie uma nova conversa para começar.</p></div>';
+                    document.getElementById('chatTitle').textContent = 'Selecione ou crie uma conversa';
+                    document.getElementById('msgInput').disabled = true;
+                    document.getElementById('btnSend').disabled = true;
+                }
+                await carregarConversas();
+            } catch (e) {
+                console.error('Erro ao excluir:', e);
+            }
+        }
+
+        // ── Rename Modal ────────────────────────────
+        function openRenameModal(id, titulo) {
+            renameTargetId = id;
+            document.getElementById('renameInput').value = titulo;
+            document.getElementById('renameModal').classList.add('visible');
+            setTimeout(() => document.getElementById('renameInput').focus(), 100);
+        }
+
+        function closeRenameModal() {
+            document.getElementById('renameModal').classList.remove('visible');
+            renameTargetId = null;
+        }
+
+        async function confirmRename() {
+            const titulo = document.getElementById('renameInput').value.trim();
+            if (!titulo || !renameTargetId) return;
+            try {
+                await fetch('/renomear_conversa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: renameTargetId, titulo })
+                });
+                if (conversaAtual === renameTargetId) {
+                    document.getElementById('chatTitle').textContent = titulo;
+                }
+                closeRenameModal();
+                await carregarConversas();
+            } catch (e) {
+                console.error('Erro ao renomear:', e);
+            }
+        }
+
+        // ── Busca ───────────────────────────────────
+        function buscarConversas(q) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const url = q.trim() ? `/buscar_conversas?q=${encodeURIComponent(q)}` : '/carregar_conversas';
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    renderConversas(data);
+                } catch (e) {
+                    console.error('Erro na busca:', e);
+                }
+            }, 300);
+        }
+
+        // ── Chat ────────────────────────────────────
+        function handleKey(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                enviar();
+            }
+        }
+
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+        }
+
+        async function enviar() {
+            if (enviando || !conversaAtual) return;
+            const input = document.getElementById('msgInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            enviando = true;
+            input.value = '';
+            input.style.height = 'auto';
+            document.getElementById('btnSend').disabled = true;
+
+            appendMessage('user', msg);
+            showTyping(true);
+            scrollToBottom();
+
+            try {
+                const res = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mensagem: msg, conversa_id: conversaAtual })
+                });
+                const data = await res.json();
+                showTyping(false);
+
+                if (data.error) {
+                    appendMessage('assistant', `**Erro:** ${data.error}`);
+                } else {
+                    appendMessage('assistant', data.resposta);
+                }
+
+                // Atualizar lista (título pode ter mudado)
+                carregarConversas();
+            } catch (e) {
+                showTyping(false);
+                appendMessage('assistant', '**Erro de conexão.** Verifique sua rede.');
+            }
+
+            enviando = false;
+            document.getElementById('btnSend').disabled = false;
+            input.focus();
+            scrollToBottom();
+        }
+
+        function appendMessage(role, content, timestamp) {
+            const el = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+
+            let html = '';
+            if (role === 'assistant') {
+                html = renderMarkdown(content);
+            } else {
+                html = `<div>${escapeHtml(content).replace(/\n/g, '<br>')}</div>`;
+            }
+
+            if (timestamp) {
+                const d = new Date(timestamp + 'Z');
+                const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                html += `<div class="msg-time">${timeStr}</div>`;
+            }
+
+            div.innerHTML = html;
+            el.appendChild(div);
+
+            // Adicionar botões de copiar em blocos de código
+            div.querySelectorAll('pre').forEach(pre => {
+                const btn = document.createElement('button');
+                btn.className = 'copy-btn';
+                btn.textContent = 'Copiar';
+                btn.onclick = () => {
+                    const code = pre.querySelector('code')?.textContent || pre.textContent;
+                    navigator.clipboard.writeText(code).then(() => {
+                        btn.textContent = 'Copiado!';
+                        setTimeout(() => btn.textContent = 'Copiar', 2000);
+                    });
+                };
+                pre.style.position = 'relative';
+                pre.appendChild(btn);
+            });
+        }
+
+        function renderMarkdown(text) {
+            try {
+                return marked.parse(text);
+            } catch {
+                return escapeHtml(text).replace(/\n/g, '<br>');
+            }
+        }
+
+        function showTyping(show) {
+            document.getElementById('typingIndicator').classList.toggle('visible', show);
+        }
+
+        function scrollToBottom() {
+            const el = document.getElementById('messages');
+            requestAnimationFrame(() => {
+                el.scrollTop = el.scrollHeight;
+            });
+        }
+
+        // ── Utilitários ─────────────────────────────
+        function escapeHtml(str) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return String(str).replace(/[&<>"']/g, c => map[c]);
+        }
+
+        function escapeAttr(str) {
+            return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+    </script>
+</body>
+</html>
