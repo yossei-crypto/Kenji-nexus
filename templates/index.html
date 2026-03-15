@@ -2,218 +2,648 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Kenji IA | Terminal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kenji IA — Terminal</title>
+    <!-- Markdown & Syntax Highlighting -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/highlight.min.js"></script>
     <style>
-        :root { --a: #00e5ff; --b: #050505; --p: #111; }
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        
-        body, html { 
-            height: 100%; width: 100%; overflow: hidden; 
-            background: var(--b); font-family: 'JetBrains Mono', monospace;
-            position: fixed; color: #fff;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0a0f;
+            --surface: #12121a;
+            --surface2: #1a1a26;
+            --border: #1e1e2e;
+            --accent: #00ff88;
+            --accent-dim: #00cc6a;
+            --accent-bg: rgba(0,255,136,0.08);
+            --text: #e0e0e0;
+            --text-dim: #777;
+            --danger: #ff4455;
+            --danger-bg: rgba(255,68,85,0.1);
+            --sidebar-w: 280px;
+            --radius: 12px;
         }
 
-        /* HEADER */
-        header {
-            position: fixed; top: 0; left: 0; right: 0; height: 60px;
-            background: rgba(0,0,0,0.95); border-bottom: 1px solid var(--a);
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 15px; z-index: 100; backdrop-filter: blur(10px);
+        html, body { height: 100%; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            overflow: hidden;
         }
 
-        .brand { font-weight: 900; color: var(--a); text-transform: uppercase; letter-spacing: 2px; font-size: 1.1rem; }
+        /* ── Sidebar ────────────────────────────── */
 
-        /* SIDEBAR */
-        #sb {
-            position: fixed; top: 0; left: 0; bottom: 0; width: 280px;
-            background: #000; z-index: 300; transform: translateX(-100%);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border-right: 1px solid var(--a); box-shadow: 20px 0 50px rgba(0,0,0,0.8);
-        }
-        #sb.open { transform: translateX(0); }
-
-        /* OVERLAY PARA O SWIPE */
-        #ov {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-            display: none; z-index: 250; opacity: 0; transition: 0.3s;
-        }
-        #ov.active { display: block; opacity: 1; }
-
-        /* ÁREA DE CHAT */
-        #chat-wrapper {
-            position: absolute; top: 60px; bottom: 85px; left: 0; right: 0;
-            overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px;
-            scroll-behavior: smooth; -webkit-overflow-scrolling: touch;
+        .sidebar {
+            width: var(--sidebar-w);
+            min-width: var(--sidebar-w);
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            transition: transform 0.3s;
+            z-index: 100;
         }
 
-        .msg { max-width: 90%; padding: 14px; border-radius: 10px; font-size: 14px; line-height: 1.5; word-wrap: break-word; }
-        .user { align-self: flex-end; background: #1a1a1a; border: 1px solid #333; border-bottom-right-radius: 2px; }
-        .ai { align-self: flex-start; border-left: 2px solid var(--a); width: 100%; background: rgba(0,229,255,0.02); }
-
-        /* BLOCOS DE CÓDIGO COM BOTÃO */
-        pre {
-            background: #000; padding: 35px 12px 12px; border-radius: 6px; 
-            margin: 15px 0; overflow-x: auto; border: 1px solid #222; position: relative;
-            max-width: 100%; white-space: pre-wrap;
+        .sidebar-header {
+            padding: 20px 16px 12px;
+            border-bottom: 1px solid var(--border);
         }
+
+        .sidebar-header h1 {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            color: var(--accent);
+            font-size: 1.2rem;
+            letter-spacing: 3px;
+            font-weight: 700;
+        }
+
+        .sidebar-header .version {
+            color: var(--text-dim);
+            font-size: 0.65rem;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+
+        .sidebar-actions {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 10px 14px;
+            border: none;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--bg);
+            font-weight: 600;
+        }
+        .btn-primary:hover { background: var(--accent-dim); }
+
+        .search-box {
+            position: relative;
+        }
+        .search-box input {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 9px 12px 9px 32px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.8rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-box input:focus { border-color: var(--accent); }
+        .search-box .search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+
+        .conversation-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .conversation-list::-webkit-scrollbar { width: 4px; }
+        .conversation-list::-webkit-scrollbar-track { background: transparent; }
+        .conversation-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        .conv-item {
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.82rem;
+            color: var(--text-dim);
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            position: relative;
+        }
+
+        .conv-item:hover { background: var(--surface2); color: var(--text); }
+        .conv-item.active { background: var(--accent-bg); color: var(--accent); }
+
+        .conv-item .conv-title {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .conv-item .conv-actions {
+            display: none;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .conv-item:hover .conv-actions { display: flex; }
+
+        .conv-action-btn {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 0.8rem;
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: color 0.2s, background 0.2s;
+        }
+        .conv-action-btn:hover { color: var(--text); background: var(--border); }
+        .conv-action-btn.delete:hover { color: var(--danger); background: var(--danger-bg); }
+
+        .sidebar-footer {
+            padding: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .btn-logout {
+            width: 100%;
+            background: transparent;
+            color: var(--text-dim);
+            border: 1px solid var(--border);
+        }
+        .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+
+        /* ── Main Chat Area ──────────────────────── */
+
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            min-width: 0;
+        }
+
+        .chat-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--surface);
+        }
+
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text);
+            font-size: 1.3rem;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .chat-header-title {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text);
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            scroll-behavior: smooth;
+        }
+
+        .messages-container::-webkit-scrollbar { width: 6px; }
+        .messages-container::-webkit-scrollbar-track { background: transparent; }
+        .messages-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+
+        .welcome-msg {
+            text-align: center;
+            color: var(--text-dim);
+            margin: auto;
+            max-width: 400px;
+        }
+        .welcome-msg h2 {
+            color: var(--accent);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.3rem;
+            margin-bottom: 12px;
+        }
+        .welcome-msg p { font-size: 0.85rem; line-height: 1.6; }
+
+        .message {
+            max-width: 80%;
+            padding: 14px 18px;
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+            line-height: 1.65;
+            word-break: break-word;
+            position: relative;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background: var(--accent-bg);
+            border: 1px solid rgba(0,255,136,0.15);
+            color: var(--text);
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+        }
+
+        .message .msg-time {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            margin-top: 8px;
+            text-align: right;
+        }
+
+        /* Markdown inside messages */
+        .message.assistant h1, .message.assistant h2, .message.assistant h3 {
+            color: var(--accent);
+            margin: 12px 0 6px;
+        }
+        .message.assistant h1 { font-size: 1.15rem; }
+        .message.assistant h2 { font-size: 1.05rem; }
+        .message.assistant h3 { font-size: 0.95rem; }
+
+        .message.assistant p { margin: 6px 0; }
+
+        .message.assistant ul, .message.assistant ol {
+            margin: 6px 0 6px 20px;
+        }
+
+        .message.assistant a {
+            color: var(--accent);
+            text-decoration: underline;
+        }
+
+        .message.assistant code {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.82rem;
+        }
+
+        .message.assistant :not(pre) > code {
+            background: rgba(0,255,136,0.08);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--accent);
+        }
+
+        .message.assistant pre {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            margin: 10px 0;
+            overflow-x: auto;
+            position: relative;
+        }
+
         .copy-btn {
-            position: absolute; top: 8px; right: 8px; background: var(--a);
-            color: #000; border: none; padding: 5px 10px; border-radius: 4px;
-            font-size: 10px; font-weight: bold; cursor: pointer; z-index: 10;
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--border);
+            border: none;
+            color: var(--text-dim);
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            font-family: inherit;
+            transition: all 0.2s;
+            opacity: 0;
+        }
+        .message.assistant pre:hover .copy-btn { opacity: 1; }
+        .copy-btn:hover { background: var(--accent); color: var(--bg); }
+
+        .message.assistant blockquote {
+            border-left: 3px solid var(--accent);
+            padding: 8px 14px;
+            margin: 8px 0;
+            background: rgba(0,255,136,0.03);
+            color: var(--text-dim);
         }
 
-        /* INPUT AREA */
-        .input-zone {
-            position: fixed; bottom: 0; left: 0; right: 0; height: 85px;
-            background: #000; border-top: 1px solid #1a1a1a; padding: 15px;
-            padding-bottom: env(safe-area-inset-bottom);
+        .message.assistant table {
+            border-collapse: collapse;
+            margin: 10px 0;
+            width: 100%;
+            font-size: 0.82rem;
         }
-        .input-shell {
-            background: #0d0d0d; border: 1px solid var(--a); border-radius: 25px;
-            display: flex; align-items: center; padding: 0 18px; height: 100%;
+        .message.assistant th, .message.assistant td {
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+            text-align: left;
         }
-        input { flex: 1; background: transparent; border: none; color: #fff; font-size: 16px; outline: none; }
-        .send-btn { color: var(--a); font-size: 24px; cursor: pointer; background: none; border: none; }
+        .message.assistant th {
+            background: var(--surface);
+            color: var(--accent);
+        }
 
-        .hist-item { padding: 15px; border-bottom: 1px solid #111; color: #666; font-size: 13px; cursor: pointer; }
-        .hist-item:active { background: #0a0a0a; color: var(--a); }
+        /* Typing indicator */
+        .typing-indicator {
+            align-self: flex-start;
+            display: none;
+            padding: 14px 18px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+        .typing-indicator.visible { display: flex; gap: 6px; align-items: center; }
+
+        .typing-dot {
+            width: 7px;
+            height: 7px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: typingBounce 1.4s infinite;
+        }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typingBounce {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-6px); opacity: 1; }
+        }
+
+        /* ── Input Area ──────────────────────────── */
+
+        .input-area {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .input-wrapper textarea {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 16px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: none;
+            outline: none;
+            min-height: 44px;
+            max-height: 160px;
+            line-height: 1.5;
+            transition: border-color 0.2s;
+        }
+
+        .input-wrapper textarea:focus { border-color: var(--accent); }
+
+        .btn-send {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: var(--accent);
+            border: none;
+            color: var(--bg);
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, transform 0.1s;
+            flex-shrink: 0;
+        }
+
+        .btn-send:hover { background: var(--accent-dim); }
+        .btn-send:active { transform: scale(0.95); }
+        .btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .input-hint {
+            text-align: center;
+            font-size: 0.68rem;
+            color: var(--text-dim);
+            margin-top: 8px;
+        }
+
+        /* ── Mobile Overlay ──────────────────────── */
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 99;
+        }
+
+        /* ── Rename Modal ────────────────────────── */
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.visible { display: flex; }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            width: 90%;
+            max-width: 400px;
+        }
+        .modal h3 { margin-bottom: 16px; font-size: 0.95rem; color: var(--accent); }
+        .modal input {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.85rem;
+            outline: none;
+            margin-bottom: 16px;
+        }
+        .modal input:focus { border-color: var(--accent); }
+        .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
+        .modal .btn-cancel {
+            background: transparent;
+            color: var(--text-dim);
+            border: 1px solid var(--border);
+        }
+        .modal .btn-cancel:hover { border-color: var(--text-dim); }
+        .modal .btn-confirm {
+            background: var(--accent);
+            color: var(--bg);
+            font-weight: 600;
+        }
+
+        /* ── Responsive ──────────────────────────── */
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: 0; top: 0;
+                transform: translateX(-100%);
+            }
+            .sidebar.open { transform: translateX(0); }
+            .sidebar-overlay.open { display: block; }
+            .menu-toggle { display: block; }
+            .message { max-width: 92%; }
+        }
     </style>
 </head>
 <body>
+    <!-- Sidebar Overlay (mobile) -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
-    <div id="ov" onclick="toggleSidebar()"></div>
-
-    <div id="sb">
-        <div style="padding: 25px;">
-            <button onclick="novaMissao()" style="width:100%; padding:14px; background:var(--a); color:#000; border:none; border-radius:8px; font-weight:bold; letter-spacing:1px;">+ NOVA MISSÃO</button>
-            <div id="historico" style="margin-top:20px;"></div>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h1>KENJI IA</h1>
+            <div class="version">NEURAL SYSTEM v2.0</div>
         </div>
-    </div>
+        <div class="sidebar-actions">
+            <button class="btn btn-primary" onclick="novaConversa()">
+                &#10010; Nova Conversa
+            </button>
+            <div class="search-box">
+                <span class="search-icon">&#128269;</span>
+                <input type="text" id="searchInput" placeholder="Buscar conversas..." oninput="buscarConversas(this.value)">
+            </div>
+        </div>
+        <div class="conversation-list" id="convList"></div>
+        <div class="sidebar-footer">
+            <button class="btn btn-logout" onclick="location.href='/logout'">
+                &#9211; Desconectar
+            </button>
+        </div>
+    </aside>
 
-    <header>
-        <button onclick="toggleSidebar()" style="background:none; border:none; color:var(--a); font-size:26px;">☰</button>
-        <div class="brand">Kenji IA</div>
-        <a href="https://instagram.com/cybernmap" target="_blank" style="color:var(--a); text-decoration:none; font-size:11px; font-weight:bold;">@cybernmap</a>
-        <button onclick="location.href='/logout'" style="background:none; border:1px solid #ff3e3e; color:#ff3e3e; padding:5px 12px; border-radius:5px; font-size:10px; font-weight:bold;">SAIR</button>
-    </header>
+    <!-- Main -->
+    <main class="main">
+        <div class="chat-header">
+            <button class="menu-toggle" onclick="toggleSidebar()">&#9776;</button>
+            <div class="status-dot"></div>
+            <div class="chat-header-title" id="chatTitle">Selecione ou crie uma conversa</div>
+        </div>
 
-    <div id="chat-wrapper"></div>
+        <div class="messages-container" id="messages">
+            <div class="welcome-msg" id="welcomeMsg">
+                <h2>// Bem-vindo ao Kenji IA</h2>
+                <p>Assistente técnico de elite.<br>Crie uma nova conversa para começar.</p>
+            </div>
+        </div>
 
-    <div class="input-zone">
-        <div class="input-shell">
-            <input type="text" id="user-input" placeholder="Aguardando comando..." autocomplete="off">
-            <button class="send-btn" onclick="enviar()">➤</button>
+        <div class="typing-indicator" id="typingIndicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-wrapper">
+                <textarea
+                    id="msgInput"
+                    placeholder="Digite sua mensagem..."
+                    rows="1"
+                    onkeydown="handleKey(event)"
+                    oninput="autoResize(this)"
+                    disabled
+                ></textarea>
+                <button class="btn-send" id="btnSend" onclick="enviar()" disabled title="Enviar (Enter)">
+                    &#9654;
+                </button>
+            </div>
+            <div class="input-hint">Enter para enviar &middot; Shift+Enter para nova linha</div>
+        </div>
+    </main>
+
+    <!-- Rename Modal -->
+    <div class="modal-overlay" id="renameModal">
+        <div class="modal">
+            <h3>Renomear Conversa</h3>
+            <input type="text" id="renameInput" placeholder="Novo título..." maxlength="100" onkeydown="if(event.key==='Enter')confirmRename()">
+            <div class="modal-btns">
+                <button class="btn btn-cancel" onclick="closeRenameModal()">Cancelar</button>
+                <button class="btn btn-confirm" onclick="confirmRename()">Salvar</button>
+            </div>
         </div>
     </div>
 
     <script>
-        let convId = null;
-        let touchStartX = 0;
-        let touchStartY = 0;
+        // ── Estado ──────────────────────────────────
+        let conversaAtual = null;
+        let enviando = false;
+        let renameTargetId = null;
+        let searchTimeout = null;
 
-        function toggleSidebar() {
-            document.getElementById('sb').classList.toggle('open');
-            document.getElementById('ov').classList.toggle('active');
-        }
-
-        // SISTEMA DE GESTOS APRIMORADO
-        document.addEventListener('touchstart', e => {
-            touchStartX = e.changedTouches[0].screenX;
-            touchStartY = e.changedTouches[0].screenY;
-        }, false);
-
-        document.addEventListener('touchend', e => {
-            let diffX = e.changedTouches[0].screenX - touchStartX;
-            let diffY = e.changedTouches[0].screenY - touchStartY;
-            
-            // Verifica se o movimento foi mais horizontal que vertical
-            if (Math.abs(diffX) > Math.abs(diffY)) {
-                // Puxar da esquerda para a direita (Abrir)
-                if (diffX > 80 && touchStartX < 50) {
-                    if (!document.getElementById('sb').classList.contains('open')) toggleSidebar();
-                }
-                // Puxar da direita para a esquerda (Fechar)
-                if (diffX < -80) {
-                    if (document.getElementById('sb').classList.contains('open')) toggleSidebar();
-                }
-            }
-        }, false);
-
-        async function carregarSidebar() {
-            const res = await fetch('/carregar_conversas');
-            const data = await res.json();
-            document.getElementById('historico').innerHTML = data.map(c => `
-                <div class="hist-item" onclick="carregarChat('${c.id}')">
-                    > ${c.titulo}
-                </div>
-            `).join('');
-        }
-
-        async function novaMissao() {
-            const res = await fetch('/nova_conversa', {method: 'POST'});
-            const data = await res.json();
-            convId = data.id;
-            document.getElementById('chat-wrapper').innerHTML = '';
-            if(document.getElementById('sb').classList.contains('open')) toggleSidebar();
-            carregarSidebar();
-        }
-
-        async function carregarChat(id) {
-            convId = id;
-            if(document.getElementById('sb').classList.contains('open')) toggleSidebar();
-            const res = await fetch(`/carregar_historico/${id}`);
-            const msgs = await res.json();
-            const box = document.getElementById('chat-wrapper');
-            box.innerHTML = '';
-            msgs.forEach(m => addBubble(m.content, m.role));
-            carregarSidebar();
-        }
-
-        function addBubble(txt, role) {
-            const box = document.getElementById('chat-wrapper');
-            const div = document.createElement('div');
-            div.className = `msg ${role === 'user' ? 'user' : 'ai'}`;
-            div.innerHTML = role === 'assistant' ? marked.parse(txt) : txt;
-            box.appendChild(div);
-            box.scrollTop = box.scrollHeight;
-            
-            // Adiciona botões de cópia em novos blocos de código
-            div.querySelectorAll('pre').forEach(pre => {
-                if (!pre.querySelector('.copy-btn')) {
-                    const btn = document.createElement('button');
-                    btn.className = 'copy-btn';
-                    btn.innerText = 'COPIAR';
-                    btn.onclick = () => {
-                        const code = pre.innerText.replace('COPIAR', '');
-                        navigator.clipboard.writeText(code);
-                        btn.innerText = 'OK!';
-                        setTimeout(() => btn.innerText = 'COPIAR', 2000);
-                    };
-                    pre.appendChild(btn);
-                }
+        // ── Inicialização ───────────────────────────
+        document.addEventListener('DOMContentLoaded', () => {
+            carregarConversas();
+            marked.setOptions({
+                highlight: (code, lang) => {
+                    if (lang && hljs.getLanguage(lang)) {
+                        return hljs.highlight(code, { language: lang }).value;
+                    }
+                    return hljs.highlightAuto(code).value;
+                },
+                breaks: true,
+                gfm: true,
             });
-        }
+        });
 
-        async function enviar() {
-            const inp = document.getElementById('user-input');
-            const val = inp.value.trim();
-            if(!val || !convId) return;
-            inp.value = '';
-            addBubble(val, 'user');
-            
-            const res = await fetch('/chat', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({mensagem: val, conversa_id: convId})
-            });
-            const data = await res.json();
-            addBubble(data.resposta, 'assistant');
-        }
-
-        document.getElementById('user-input').onkeypress = (e) => e.key === 'Enter' && enviar();
-        window.onload = () => { carregarSidebar(); novaMissao(); };
-    </script>
-</body>
-</html>
+        // ── Sidebar Toggle (mobile) ─────────────────
+        function toggleSideba
