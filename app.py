@@ -1,35 +1,39 @@
-import os, sqlite3, requests, uuid
+import os, sqlite3, requests, uuid, sys
 from flask import Flask, render_template, request, jsonify, session, redirect
 
 app = Flask(__name__)
-app.secret_key = "kenji_ia_ultra_secret_key_2026"
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'kenji_ia_secret_2026')
 
-# CONFIGURAÇÕES TÁTICAS
-SENHA_MESTRA = "1234"
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-DB_PATH = "/tmp/kenji_memory.db" # Pasta temporária do Render para evitar erros de escrita
+# --- LOG DE INICIALIZAÇÃO ---
+print(">>> [SISTEMA] INICIANDO KENJI IA...")
+
+# Banco de dados no /tmp para evitar erros de permissão no Render
+DB_PATH = "/tmp/kenji_memory.db"
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
-def init_db():
+try:
     with get_db() as conn:
         conn.execute('CREATE TABLE IF NOT EXISTS conversas (id TEXT PRIMARY KEY, titulo TEXT, data DATETIME DEFAULT CURRENT_TIMESTAMP)')
         conn.execute('CREATE TABLE IF NOT EXISTS mensagens (id INTEGER PRIMARY KEY AUTOINCREMENT, conversa_id TEXT, role TEXT, content TEXT)')
         conn.commit()
-
-init_db()
+    print(">>> [SISTEMA] BANCO DE DATOS VINCULADO.")
+except Exception as e:
+    print(f">>> [ERRO] FALHA NO BANCO: {e}")
 
 @app.route("/")
 def index():
-    if not session.get("auth"): return render_template("login.html")
+    if not session.get("auth"):
+        return render_template("login.html")
     return render_template("index.html")
 
 @app.route("/login", methods=["POST"])
 def login():
-    if request.get_json().get("senha") == SENHA_MESTRA:
+    data = request.get_json()
+    if data.get("senha") == "1234":
         session["auth"] = True
         return jsonify({"status": "ok"})
     return jsonify({"status": "erro"}), 401
@@ -45,20 +49,28 @@ def chat():
     data = request.json
     msg, cid = data.get("mensagem"), data.get("conversa_id")
     
-    # Motor de Resposta
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        return jsonify({"resposta": "⚠️ ERRO: Configure a GROQ_API_KEY no painel do Render!"})
+
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [
-            {"role": "system", "content": "Você é a Kenji IA, criada por @cybernmap. Use tom hacker, direto e técnico. Sempre use blocos de código markdown."},
+            {"role": "system", "content": "Você é a Kenji IA. Seja técnico, hacker e direto. Use Markdown."},
             {"role": "user", "content": msg}
         ]
     }
+    
     try:
-        res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload).json()
-        resposta = res['choices'][0]['message']['content']
-    except:
-        resposta = "❌ Erro na conexão neural. Verifique a API Key no Render."
+        res = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json=payload,
+            timeout=10
+        )
+        resposta = res.json()['choices'][0]['message']['content']
+    except Exception as e:
+        resposta = f"❌ Falha Neural: {str(e)}"
 
     with get_db() as conn:
         conn.execute("INSERT INTO mensagens (conversa_id, role, content) VALUES (?, ?, ?)", (cid, "user", msg))
@@ -86,4 +98,5 @@ def nova():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    print(f">>> [SISTEMA] KENJI IA ONLINE NA PORTA {port}")
     app.run(host="0.0.0.0", port=port)
