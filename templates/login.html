@@ -2,143 +2,248 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kenji IA | Terminal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kenji IA — Acesso</title>
     <style>
-        :root { --accent: #00e5ff; --bg: #000; --glass: rgba(10, 10, 10, 0.85); }
-        
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'JetBrains Mono', monospace; }
-        
-        body { background: var(--bg); height: 100dvh; overflow: hidden; display: flex; align-items: center; justify-content: center; color: var(--accent); }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        /* FUNDO MATRIX */
-        #matrix { position: fixed; top: 0; left: 0; z-index: 1; opacity: 0.3; }
+        :root {
+            --bg: #0a0a0f;
+            --surface: #12121a;
+            --border: #1e1e2e;
+            --accent: #00ff88;
+            --accent-dim: #00cc6a;
+            --text: #e0e0e0;
+            --text-dim: #888;
+            --danger: #ff4444;
+        }
 
-        /* CARD DE LOGIN MODERNO (MENOS QUADRADO) */
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* Fundo animado com grid */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            animation: gridMove 20s linear infinite;
+            z-index: 0;
+        }
+
+        @keyframes gridMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(40px, 40px); }
+        }
+
+        .login-container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 420px;
+            padding: 20px;
+        }
+
         .login-card {
-            position: relative; z-index: 10;
-            width: 90%; max-width: 380px;
-            padding: 50px 30px;
-            background: var(--glass);
-            backdrop-filter: blur(15px); /* Efeito de vidro */
-            border: 1px solid rgba(0, 229, 255, 0.3);
-            border-radius: 24px; /* Cantos arredondados profissionais */
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 48px 36px;
+            box-shadow: 0 0 60px rgba(0,255,136,0.05);
+            transition: box-shadow 0.3s;
+        }
+
+        .login-card:hover {
+            box-shadow: 0 0 80px rgba(0,255,136,0.08);
+        }
+
+        .logo {
             text-align: center;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 229, 255, 0.1);
-            animation: fadeIn 1s ease-out;
+            margin-bottom: 36px;
         }
 
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-
-        .brand { 
-            font-size: 2.2rem; 
-            font-weight: 900; 
-            letter-spacing: 6px; 
-            margin-bottom: 35px; 
+        .logo h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 4px;
             text-transform: uppercase;
-            background: linear-gradient(to bottom, #fff, var(--accent));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.5));
         }
 
-        /* INPUTS ARREDONDADOS E MODERNOS */
-        input {
-            width: 100%; 
-            padding: 18px; 
-            background: rgba(255, 255, 255, 0.05); 
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 15px; /* Arredondamento suave */
-            color: #fff; 
-            margin-bottom: 25px; 
-            outline: none; 
-            text-align: center;
-            font-size: 1rem;
-            transition: 0.3s;
-        }
-
-        input:focus { 
-            border-color: var(--accent); 
-            background: rgba(0, 229, 255, 0.05);
-            box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
-        }
-
-        /* BOTÃO TÁTICO BRILHANTE */
-        button {
-            width: 100%; 
-            padding: 18px; 
-            background: var(--accent); 
-            color: #000;
-            border: none; 
-            border-radius: 15px; 
-            font-weight: 800; 
-            cursor: pointer; 
-            text-transform: uppercase;
+        .logo p {
+            color: var(--text-dim);
+            font-size: 0.75rem;
+            margin-top: 8px;
             letter-spacing: 2px;
-            transition: 0.4s;
-            box-shadow: 0 4px 15px rgba(0, 229, 255, 0.4);
         }
 
-        button:active { transform: scale(0.95); }
-        button:hover { background: #fff; box-shadow: 0 0 25px #fff; }
+        .terminal-line {
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            margin-bottom: 20px;
+        }
 
-        .status { font-size: 10px; margin-top: 25px; opacity: 0.4; letter-spacing: 1px; }
+        .terminal-line span {
+            color: var(--accent);
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 24px;
+        }
+
+        .input-group input {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 16px 14px 44px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .input-group input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0,255,136,0.1);
+        }
+
+        .input-group .icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-dim);
+            font-size: 1.1rem;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .btn-login:hover {
+            background: var(--accent-dim);
+        }
+
+        .btn-login:active {
+            transform: scale(0.98);
+        }
+
+        .btn-login:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .error-msg {
+            color: var(--danger);
+            font-size: 0.82rem;
+            text-align: center;
+            margin-top: 16px;
+            min-height: 20px;
+            transition: opacity 0.3s;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            color: var(--text-dim);
+            font-size: 0.7rem;
+            letter-spacing: 1px;
+        }
+
+        @media (max-width: 480px) {
+            .login-card { padding: 36px 24px; }
+            .logo h1 { font-size: 1.6rem; }
+        }
     </style>
 </head>
-<body onclick="iniciarSessao()">
-
-    <canvas id="matrix"></canvas>
-
-    <div class="login-card">
-        <div class="brand">Kenji IA</div>
-        <input type="password" id="pass" placeholder="PASSWORD" autocomplete="current-password">
-        <button onclick="fazerLogin()">ACESSAR TERMINAL</button>
-        <div class="status" id="audio-status">@cybernmap | ENCRYPTED LINK</div>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="logo">
+                <h1>Kenji IA</h1>
+                <p>Sistema Neural v2.0</p>
+            </div>
+            <div class="terminal-line">
+                <span>$</span> aguardando autenticação...
+            </div>
+            <form id="loginForm" onsubmit="return doLogin(event)">
+                <div class="input-group">
+                    <span class="icon">&#128274;</span>
+                    <input
+                        type="password"
+                        id="senha"
+                        placeholder="Senha de acesso"
+                        autocomplete="current-password"
+                        required
+                        autofocus
+                    />
+                </div>
+                <button type="submit" class="btn-login" id="btnLogin">
+                    Acessar Sistema
+                </button>
+            </form>
+            <div class="error-msg" id="errorMsg"></div>
+        </div>
+        <div class="footer">
+            Kenji IA &mdash; Assistente Neural Avançado
+        </div>
     </div>
 
-    <audio id="bgm" loop><source src="/static/musica.mp3" type="audio/mpeg"></audio>
-
     <script>
-        // --- MATRIX ENGINE ---
-        const canvas = document.getElementById('matrix'), ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*";
-        const fontSize = 16, columns = canvas.width / fontSize;
-        const drops = Array(Math.floor(columns)).fill(1);
+        async function doLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnLogin');
+            const errEl = document.getElementById('errorMsg');
+            const senha = document.getElementById('senha').value;
 
-        function drawMatrix() {
-            ctx.fillStyle = "rgba(0, 0, 0, 0.05)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#00e5ff"; ctx.font = fontSize + "px monospace";
-            drops.forEach((y, i) => {
-                const text = chars[Math.floor(Math.random() * chars.length)];
-                ctx.fillText(text, i * fontSize, y * fontSize);
-                if (y * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
-                drops[i]++;
-            });
-        }
-        setInterval(drawMatrix, 50);
+            btn.disabled = true;
+            btn.textContent = 'Conectando...';
+            errEl.textContent = '';
 
-        // --- SISTEMA ---
-        let ativo = false;
-        function iniciarSessao() {
-            if(!ativo) {
-                document.getElementById('bgm').play().catch(() => {});
-                document.getElementById('audio-status').innerText = "AUDIO SYSTEM: ONLINE";
-                ativo = true;
-            }
-        }
-
-        async function fazerLogin() {
-            const senha = document.getElementById('pass').value;
-            const res = await fetch('/login', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({senha: senha})
-            });
-            if(res.ok) window.location.href = '/';
-            else {
-                alert('ACESSO NEGADO');
-                document.getElementById('pass').value = '';
+            try {
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ senha })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'ok') {
+                    window.location.href = '/';
+                } else {
+                    errEl.textContent = data.msg || 'Acesso negado.';
+                    btn.disabled = false;
+                    btn.textContent = 'Acessar Sistema';
+                }
+            } catch (err) {
+                errEl.textContent = 'Falha na conexão com o servidor.';
+                btn.disabled = false;
+                btn.textContent = 'Acessar Sistema';
             }
         }
     </script>
