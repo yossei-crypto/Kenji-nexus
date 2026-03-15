@@ -1,97 +1,98 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Kenji Nexus | Command Center</title>
+    <title>Kenji Nexus | Elite Terminal</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        :root { --bg: #050505; --accent: #00e5ff; --panel: #0a0a0a; --text: #e0e0e0; }
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        
-        body, html { 
-            height: 100%; width: 100%; overflow: hidden; 
-            background: var(--bg); font-family: 'Inter', sans-serif;
-            position: fixed;
+        :root {
+            --bg: #050505; --sidebar: #000; --accent: #00e5ff;
+            --text: #ffffff; --msg-user: #1a1a1a; --msg-ai: rgba(0, 229, 255, 0.05);
+        }
+        [data-theme="light"] {
+            --bg: #ffffff; --sidebar: #f0f0f0; --accent: #007c8f;
+            --text: #1a1a1a; --msg-user: #e0e0e0; --msg-ai: #f9f9f9;
         }
 
-        /* EFEITO GLITCH NO NOME */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'JetBrains Mono', monospace; }
+        body, html { height: 100%; width: 100%; overflow: hidden; background: var(--bg); color: var(--text); position: fixed; }
+
+        /* ANIMAÇÃO DE GLITCH PROFISSIONAL */
         .glitch {
-            font-weight: 900; font-size: 1.2rem; color: var(--accent);
-            letter-spacing: 3px; position: relative; text-transform: uppercase;
-            animation: glitch-anim 3s infinite linear alternate-reverse;
+            font-weight: 900; color: var(--accent); letter-spacing: 2px;
+            text-transform: uppercase; position: relative;
+            animation: glitch 4s infinite;
         }
-        @keyframes glitch-anim {
-            0% { text-shadow: 2px 0 red, -2px 0 blue; transform: skew(0deg); }
-            5% { text-shadow: -2px 0 red, 2px 0 blue; transform: skew(1deg); }
-            10% { text-shadow: 2px 0 red, -2px 0 blue; transform: skew(0deg); }
-            100% { text-shadow: none; transform: skew(0deg); }
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            1% { transform: translate(-2px, 2px); }
+            2% { transform: translate(2px, -2px); }
+            3% { transform: translate(0); }
         }
 
+        /* HEADER */
         header {
-            position: fixed; top: 0; left: 0; right: 0; height: 65px;
-            background: rgba(0,0,0,0.9); border-bottom: 1px solid #1a1a1a;
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 20px; z-index: 100; backdrop-filter: blur(10px);
+            position: fixed; top: 0; width: 100%; height: 65px;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--accent); display: flex;
+            align-items: center; justify-content: space-between; padding: 0 15px; z-index: 100;
         }
 
+        /* SIDEBAR ARRASTÁVEL */
         #sidebar {
             position: fixed; top: 0; left: 0; bottom: 0; width: 280px;
-            background: #000; z-index: 200; transform: translateX(-100%);
-            transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-            border-right: 1px solid #1a1a1a; display: flex; flex-direction: column;
+            background: var(--sidebar); z-index: 200; transform: translateX(-100%);
+            transition: 0.4s cubic-bezier(0.19, 1, 0.22, 1); border-right: 1px solid var(--accent);
         }
-        #sidebar.open { transform: translateX(0); box-shadow: 10px 0 30px rgba(0,0,0,0.8); }
+        #sidebar.open { transform: translateX(0); box-shadow: 10px 0 50px rgba(0,0,0,0.9); }
 
-        /* ÁREA DE CHAT */
+        /* CHAT BOX */
         #chat-wrapper {
             position: absolute; top: 65px; bottom: 85px; left: 0; right: 0;
-            overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 25px;
-            scroll-behavior: smooth;
+            overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px;
         }
-
-        .msg { max-width: 85%; padding: 15px; border-radius: 12px; font-size: 14px; line-height: 1.6; }
-        .user { align-self: flex-end; background: #111; border: 1px solid #222; border-bottom-right-radius: 2px; }
-        .ai { align-self: flex-start; border-left: 2px solid var(--accent); width: 100%; background: rgba(0,229,255,0.02); }
+        .msg { max-width: 85%; padding: 15px; border-radius: 12px; font-size: 14px; line-height: 1.6; animation: fadeIn 0.3s forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .user { align-self: flex-end; background: var(--msg-user); color: var(--text); border: 1px solid #333; }
+        .ai { align-self: flex-start; background: var(--msg-ai); border: 1px solid var(--accent); color: var(--accent); width: 100%; }
 
         /* INPUT AREA */
         .input-zone {
-            position: fixed; bottom: 0; left: 0; right: 0; height: 85px;
-            background: #000; border-top: 1px solid #1a1a1a; padding: 15px;
-            padding-bottom: env(safe-area-inset-bottom);
+            position: fixed; bottom: 0; width: 100%; height: 85px;
+            background: var(--bg); border-top: 1px solid #222; padding: 15px;
+            display: flex; align-items: center;
         }
         .input-shell {
-            background: #0d0d0d; border: 1px solid #222; border-radius: 15px;
-            display: flex; align-items: center; padding: 0 15px; height: 100%;
+            width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--accent);
+            border-radius: 50px; display: flex; align-items: center; padding: 0 20px;
         }
-        input { flex: 1; background: transparent; border: none; color: #fff; font-size: 16px; outline: none; }
-        .send-btn { color: var(--accent); font-size: 22px; cursor: pointer; background: none; border: none; }
+        input { flex: 1; background: transparent; border: none; color: #fff; padding: 12px; font-size: 16px; outline: none; }
 
-        /* OVERLAY PARA O SWIPE */
-        #overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-            display: none; z-index: 150; opacity: 0; transition: 0.3s;
+        /* BOTÕES */
+        .btn-tatico {
+            background: transparent; border: 1px solid var(--accent); color: var(--accent);
+            padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 10px;
         }
-        #overlay.active { display: block; opacity: 1; }
+        .btn-sair { border-color: #ff3e3e; color: #ff3e3e; width: auto; padding: 5px 10px; font-size: 10px; }
     </style>
 </head>
-<body>
-
-    <div id="overlay" onclick="toggleSidebar()"></div>
+<body id="body">
 
     <div id="sidebar">
-        <div style="padding: 30px 20px; border-bottom: 1px solid #1a1a1a;">
-            <button onclick="novaMissao()" style="width:100%; padding:15px; background:var(--accent); color:#000; border:none; border-radius:8px; font-weight:900;">+ NOVA MISSÃO</button>
+        <div style="padding: 25px;">
+            <button class="btn-tatico" onclick="novaMissao()">+ NOVA MISSÃO</button>
+            <button class="btn-tatico" onclick="toggleTheme()" style="font-size: 10px;">🌓 ALTERNAR TEMA</button>
+            <div id="historico" style="margin-top: 20px;"></div>
         </div>
-        <div id="historico" style="flex:1; overflow-y:auto; padding:10px;"></div>
-        <div style="padding:20px; text-align:center; opacity:0.3; font-size:10px;">SISTEMA NEXUS v3.0</div>
     </div>
 
     <header>
-        <button onclick="toggleSidebar()" style="background:none; border:none; color:var(--accent); font-size:26px;">☰</button>
-        <div class="glitch">Kenji Nexus</div>
-        <a href="https://instagram.com/cybernmap" target="_blank" style="color:var(--accent); text-decoration:none; font-size:12px; font-weight:bold;">@cybernmap</a>
-        <button onclick="location.href='/logout'" style="background:none; border:1px solid #ff3e3e; color:#ff3e3e; padding:5px 12px; border-radius:5px; font-size:10px; font-weight:bold;">SAIR</button>
+        <button onclick="toggleSidebar()" style="background:none; border:none; color:var(--accent); font-size:28px;">☰</button>
+        <div class="glitch">KENJI NEXUS</div>
+        <a href="https://instagram.com/cybernmap" target="_blank" style="color:var(--accent); text-decoration:none; font-size:11px;">@cybernmap</a>
+        <button class="btn-tatico btn-sair" onclick="location.href='/logout'">SAIR</button>
     </header>
 
     <div id="chat-wrapper"></div>
@@ -99,29 +100,29 @@
     <div class="input-zone">
         <div class="input-shell">
             <input type="text" id="user-input" placeholder="Aguardando comando..." autocomplete="off">
-            <button class="send-btn" onclick="enviar()">➤</button>
+            <button onclick="enviar()" style="background:none; border:none; color:var(--accent); font-size:22px;">➤</button>
         </div>
     </div>
 
     <script>
         let convId = null;
-        let touchStartX = 0;
+        let startX = 0;
 
-        function toggleSidebar() {
-            const sb = document.getElementById('sidebar');
-            const ov = document.getElementById('overlay');
-            sb.classList.toggle('open');
-            ov.classList.toggle('active');
+        // TEMA
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            const target = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', target);
         }
 
-        // DETECÇÃO DE SWIPE (ARRASTAR)
-        document.addEventListener('touchstart', e => touchStartX = e.changedTouches[0].screenX);
+        // SIDEBAR & SWIPE
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+        
+        document.addEventListener('touchstart', e => startX = e.touches[0].clientX);
         document.addEventListener('touchend', e => {
-            let touchEndX = e.changedTouches[0].screenX;
-            if (touchEndX - touchStartX > 80) toggleSidebar(); // Arrastar para direita abre
-            if (touchStartX - touchEndX > 80) { // Arrastar para esquerda fecha
-                if (document.getElementById('sidebar').classList.contains('open')) toggleSidebar();
-            }
+            let diff = e.changedTouches[0].clientX - startX;
+            if (diff > 100) document.getElementById('sidebar').classList.add('open');
+            if (diff < -100) document.getElementById('sidebar').classList.remove('open');
         });
 
         async function carregarSidebar() {
@@ -129,8 +130,8 @@
             const data = await res.json();
             const div = document.getElementById('historico');
             div.innerHTML = data.map(c => `
-                <div onclick="carregarChat('${c.id}')" style="padding:15px; color:#666; border-bottom:1px solid #0a0a0a; font-size:13px;">
-                    > ${c.titulo}
+                <div onclick="carregarChat('${c.id}')" style="padding:12px; color:#666; border-bottom:1px solid #111; font-size:12px; cursor:pointer;">
+                    [${c.id}] ${c.titulo}
                 </div>
             `).join('');
         }
@@ -140,19 +141,18 @@
             const data = await res.json();
             convId = data.id;
             document.getElementById('chat-wrapper').innerHTML = '';
-            if(document.getElementById('sidebar').classList.contains('open')) toggleSidebar();
+            toggleSidebar();
             carregarSidebar();
         }
 
         async function carregarChat(id) {
             convId = id;
-            if(document.getElementById('sidebar').classList.contains('open')) toggleSidebar();
+            toggleSidebar();
             const res = await fetch(`/carregar_historico/${id}`);
             const msgs = await res.json();
             const box = document.getElementById('chat-wrapper');
             box.innerHTML = '';
             msgs.forEach(m => addBubble(m.content, m.role));
-            carregarSidebar();
         }
 
         function addBubble(txt, role, tId = null) {
