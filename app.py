@@ -90,7 +90,7 @@ def nova_conversa():
     return jsonify({"id": nid})
 
 if __name__ == "__main__":
-    # O segredo para o Render não dar erro de porta está aqui:
+    # O segredo está aqui: o Render define a porta, nós apenas a capturamos.
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
 
