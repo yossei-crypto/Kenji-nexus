@@ -1,1 +1,34 @@
-
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kenji Nexus | Login</title>
+    <style>
+        body { background: #050505; color: #00e5ff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .login-box { border: 1px solid #00e5ff; padding: 40px; background: #0a0a0a; border-radius: 8px; text-align: center; box-shadow: 0 0 15px #00e5ff44; }
+        input { width: 100%; padding: 12px; margin: 20px 0; background: #000; border: 1px solid #333; color: #fff; outline: none; }
+        button { width: 100%; padding: 12px; background: #00e5ff; border: none; color: #000; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body onclick="document.getElementById('m').play()">
+    <div class="login-box">
+        <h2 style="letter-spacing:2px">KENJI NEXUS</h2>
+        <input type="password" id="s" placeholder="SENHA MESTRA">
+        <button onclick="entrar()">ENTRAR</button>
+    </div>
+    <audio id="m" loop><source src="/static/musica.mp3" type="audio/mpeg"></audio>
+    <script>
+        async function entrar() {
+            const s = document.getElementById('s').value;
+            const r = await fetch('/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({senha: s})
+            });
+            if(r.ok) window.location.href = '/';
+            else alert('ACESSO NEGADO');
+        }
+    </script>
+</body>
+</html>
