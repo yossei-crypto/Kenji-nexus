@@ -3,101 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kenji IA | Terminal</title>
+    <title>Kenji IA | Login</title>
     <style>
-        :root { --accent: #00e5ff; --bg: #000; }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'JetBrains Mono', monospace; }
-        
-        body { background: var(--bg); height: 100dvh; overflow: hidden; display: flex; align-items: center; justify-content: center; color: var(--accent); }
-
-        /* CANVAS DA CHUVA DIGITAL */
-        #matrix { position: fixed; top: 0; left: 0; z-index: 1; opacity: 0.5; }
-
-        .login-card {
-            position: relative; z-index: 10;
-            width: 90%; max-width: 360px;
-            padding: 40px;
-            background: rgba(0, 0, 0, 0.85);
-            border: 1px solid var(--accent);
-            box-shadow: 0 0 20px var(--accent);
-            text-align: center;
-            backdrop-filter: blur(5px);
-        }
-
-        .brand { font-size: 2rem; font-weight: 900; letter-spacing: 5px; margin-bottom: 30px; text-shadow: 0 0 10px var(--accent); }
-
-        input {
-            width: 100%; padding: 15px; background: #000; border: 1px solid #333;
-            color: #fff; margin-bottom: 20px; outline: none; text-align: center;
-            font-size: 1rem; border-radius: 0;
-        }
-        input:focus { border-color: var(--accent); }
-
-        button {
-            width: 100%; padding: 15px; background: var(--accent); color: #000;
-            border: none; font-weight: bold; cursor: pointer; text-transform: uppercase;
-        }
-
-        .status { font-size: 10px; margin-top: 20px; opacity: 0.5; }
+        body { background: #000; margin: 0; height: 100dvh; display: flex; align-items: center; justify-content: center; overflow: hidden; font-family: monospace; }
+        canvas { position: absolute; top: 0; left: 0; opacity: 0.4; }
+        .card { position: relative; z-index: 10; background: rgba(0,0,0,0.9); border: 1px solid #00e5ff; padding: 40px; text-align: center; width: 85%; max-width: 350px; box-shadow: 0 0 20px #00e5ff44; }
+        h1 { color: #00e5ff; letter-spacing: 5px; margin-bottom: 30px; font-size: 1.5rem; }
+        input { width: 100%; padding: 15px; background: #000; border: 1px solid #333; color: #fff; margin-bottom: 20px; outline: none; text-align: center; }
+        button { width: 100%; padding: 15px; background: #00e5ff; color: #000; border: none; font-weight: bold; cursor: pointer; }
     </style>
 </head>
-<body onclick="startAll()">
-
-    <canvas id="matrix"></canvas>
-
-    <div class="login-card">
-        <div class="brand">KENJI IA</div>
-        <input type="password" id="pass" placeholder="DIGITE A SENHA">
-        <button onclick="login()">Ativar Sistema</button>
-        <div class="status" id="audio-status">SISTEMA: AGUARDANDO INTERAÇÃO</div>
+<body onclick="document.getElementById('m').play()">
+    <canvas id="mtx"></canvas>
+    <div class="card">
+        <h1>KENJI IA</h1>
+        <input type="password" id="p" placeholder="SENHA MESTRA">
+        <button onclick="l()">ACESSAR</button>
     </div>
-
-    <audio id="bgm" loop><source src="/static/musica.mp3" type="audio/mpeg"></audio>
-
+    <audio id="m" loop><source src="/static/musica.mp3" type="audio/mpeg"></audio>
     <script>
-        // --- EFEITO MATRIX ---
-        const canvas = document.getElementById('matrix');
-        const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*";
-        const fontSize = 16;
-        const columns = canvas.width / fontSize;
-        const drops = Array(Math.floor(columns)).fill(1);
-
-        function drawMatrix() {
-            ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#00e5ff";
-            ctx.font = fontSize + "px monospace";
-            for (let i = 0; i < drops.length; i++) {
-                const text = letters[Math.floor(Math.random() * letters.length)];
-                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
-                drops[i]++;
-            }
-        }
-        setInterval(drawMatrix, 50);
-
-        // --- FUNÇÕES DE SISTEMA ---
-        let initialized = false;
-        function startAll() {
-            if(!initialized) {
-                document.getElementById('bgm').play().catch(() => {});
-                document.getElementById('audio-status').innerText = "AUDIO: ONLINE | MATRIX: ACTIVE";
-                initialized = true;
-            }
-        }
-
-        async function login() {
-            const senha = document.getElementById('pass').value;
-            const res = await fetch('/login', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({senha: senha})
+        const c = document.getElementById('mtx'), ctx = c.getContext('2d');
+        c.width = window.innerWidth; c.height = window.innerHeight;
+        const s = 16, cols = c.width / s, d = Array(Math.floor(cols)).fill(1);
+        function draw() {
+            ctx.fillStyle = "rgba(0,0,0,0.05)"; ctx.fillRect(0,0,c.width,c.height);
+            ctx.fillStyle = "#00e5ff"; ctx.font = s + "px monospace";
+            d.forEach((y, i) => {
+                ctx.fillText(String.fromCharCode(Math.random() * 128), i * s, y * s);
+                if (y * s > c.height && Math.random() > 0.975) d[i] = 0; d[i]++;
             });
-            if(res.ok) window.location.href = '/';
-            else alert('ACESSO NEGADO');
+        }
+        setInterval(draw, 50);
+        async function l() {
+            const p = document.getElementById('p').value;
+            const res = await fetch('/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({senha:p})});
+            if(res.ok) window.location.href='/'; else alert('NEGADO');
         }
     </script>
 </body>
