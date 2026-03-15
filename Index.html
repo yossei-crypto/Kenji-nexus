@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kenji Nexus</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* DEFINIÇÃO DE CORES (VARIÁVEIS) */
+        :root { 
+            --bg: #0a0a0a; 
+            --panel: #161616; 
+            --accent: #00e5ff; 
+            --text: #fff; 
+            --user-bubble: #2b2b2b; 
+            --error: #ff5f56;
+            --sidebar-bg: #050505;
+            --border: #222;
+        }
+
+        /* MODO CLARO (LIGHT MODE) */
+        [data-theme="light"] {
+            --bg: #f5f5f5;
+            --panel: #ffffff;
+            --accent: #008ba3;
+            --text: #1a1a1a;
+            --user-bubble: #e0e0e0;
+            --sidebar-bg: #ececec;
+            --border: #ccc;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; }
+        
+        #app-container { display: flex; height: 100dvh; overflow: hidden; background: var(--bg); color: var(--text); }
+        
+        /* Menu Lateral */
+        #sidebar { 
+            width: 260px; background: var(--sidebar-bg); border-right: 1px solid var(--border); 
+            display: flex; flex-direction: column; transition: transform 0.3s ease; z-index: 100;
+        }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+        
+        .new-chat-btn {
+            width: 100%; padding: 12px; background: transparent; border: 1px solid var(--accent);
+            color: var(--accent); border-radius: 8px; cursor: pointer; font-weight: bold;
+        }
+
+        /* Botão de Alternar Modo */
+        .theme-toggle {
+            background: var(--panel); border: 1px solid var(--border); color: var(--text);
+            padding: 8px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: bold;
+        }
+
+        #lista-conversas { flex: 1; overflow-y: auto; padding: 10px; }
+        .conversa-item {
+            padding: 12px; margin-bottom: 5px; border-radius: 8px; cursor: pointer;
+            color: var(--text); opacity: 0.7; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .conversa-item:hover { background: var(--panel); opacity: 1; }
+        .conversa-ativa { background: var(--panel); color: var(--accent); opacity: 1; font-weight: bold; border-left: 3px solid var(--accent); }
+
+        #main-chat { flex: 1; display: flex; flex-direction: column; position: relative; }
+        header { padding: 15px 20px; background: var(--bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;}
+        .menu-toggle { background: none; border: none; color: var(--text); font-size: 1.5rem; margin-right: 15px; cursor: pointer; display: none; }
+        .logo-title { font-weight: 800; letter-spacing: 2px; color: var(--accent); display: flex; align-items: center;}
+        
+        .logout-btn { background: transparent; border: 1px solid var(--error); color: var(--error); padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+
+        #chat-wrapper { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        #chat-box { width: 100%; max-width: 850px; display: flex; flex-direction: column; gap: 30px; }
+        
+        .msg-row { display: flex; width: 100%; animation: fadeInUp 0.3s ease; }
+        .user-row { justify-content: flex-end; }
+        .user-bubble { background: var(--user-bubble); padding: 14px 20px; border-radius: 18px 18px 0 18px; max-width: 80%; }
+        .ai-row { gap: 15px; }
+        .ai-text { line-height: 1.7; width: 100%; color: var(--text); }
+        
+        pre { background: #000; padding: 20px; border-radius: 12px; position: relative; margin: 15px 0; border: 1px solid #333; overflow-x: auto; }
+        code { color: #00e5ff; font-family: monospace; }
+        
+        .copy-btn { position: absolute; top: 8px; right: 8px; background: rgba(255, 255, 255, 0.1); color: #fff; border: 1px solid transparent; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; }
+        
+        #input-container { padding: 20px; background: var(--bg); border-top: 1px solid var(--border); }
+        .input-wrapper { max-width: 850px; margin: 0 auto; background: var(--panel); border-radius: 30px; display: flex; padding: 8px 20px; border: 1px solid var(--border); }
+        input { flex: 1; background: transparent; border: none; color: var(--text); padding: 10px; outline: none; font-size: 1rem; }
+        .send-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 1.3rem; }
+
+        @media (max-width: 768px) {
+            .menu-toggle { display: block; }
+            #sidebar { position: absolute; height: 100%; transform: translateX(-100%); }
+            #sidebar.open { transform: translateX(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <div id="sidebar">
+            <div class="sidebar-header">
+                <button class="new-chat-btn" onclick="criarNovaConversa()">+ Nova Missão</button>
+                <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">☀️ Modo Claro</button>
+            </div>
+            <div id="lista-conversas"></div>
+        </div>
+
+        <div id="main-chat">
+            <header>
+                <div class="logo-title">
+                    <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+                    KENJI NEXUS
+                </div>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <a href="https://instagram.com/cybernmap" target="_blank" style="font-size: 0.85rem; color: var(--accent); text-decoration: none; font-weight: bold;">@cybernmap</a>
+                    <button class="logout-btn" onclick="window.location.href='/logout'">Sair</button>
+                </div>
+            </header>
+
+            <div id="chat-wrapper">
+                <div id="chat-box"></div>
+            </div>
+
+            <div id="input-container">
+                <div class="input-wrapper">
+                    <input type="text" id="user-input" placeholder="Comando tático..." autocomplete="off">
+                    <button class="send-btn" onclick="sendMessage()">➤</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let sessionAtual = null;
+        const box = document.getElementById("chat-box");
+        const input = document.getElementById("user-input");
+        const wrap = document.getElementById("chat-wrapper");
+
+        // GESTÃO DE TEMA
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute("data-theme");
+            const targetTheme = currentTheme === "light" ? "dark" : "light";
+            document.documentElement.setAttribute("data-theme", targetTheme);
+            document.getElementById("theme-btn").innerText = targetTheme === "light" ? "🌙 Modo Escuro" : "☀️ Modo Claro";
+            localStorage.setItem("theme", targetTheme);
+        }
+
+        // Carregar tema salvo
+        const savedTheme = localStorage.getItem("theme") || "dark";
+        document.documentElement.setAttribute("data-theme", savedTheme);
+        document.getElementById("theme-btn").innerText = savedTheme === "light" ? "🌙 Modo Escuro" : "☀️ Modo Claro";
+
+        window.onload = carregarSidebar;
+
+        function toggleMenu() { document.getElementById("sidebar").classList.toggle("open"); }
+
+        async function carregarSidebar() {
+            try {
+                const res = await fetch("/carregar_conversas");
+                const conversas = await res.json();
+                const lista = document.getElementById("lista-conversas");
+                lista.innerHTML = "";
+                if (conversas.length === 0) { await criarNovaConversa(); } 
+                else {
+                    conversas.forEach(c => addConversaSidebar(c.id, c.titulo));
+                    if (!sessionAtual) abrirConversa(conversas[0].id);
+                }
+            } catch(e) {}
+        }
+
+        function addConversaSidebar(id, titulo) {
+            const div = document.createElement("div");
+            div.className = "conversa-item";
+            div.id = `conv-${id}`;
+            div.innerText = titulo;
+            div.onclick = () => abrirConversa(id);
+            document.getElementById("lista-conversas").appendChild(div);
+        }
+
+        async function criarNovaConversa() {
+            const res = await fetch("/nova_conversa", {method: "POST"});
+            const data = await res.json();
+            await carregarSidebar();
+            abrirConversa(data.id);
+        }
+
+        async function abrirConversa(id) {
+            sessionAtual = id;
+            document.querySelectorAll(".conversa-item").forEach(el => el.classList.remove("conversa-ativa"));
+            const tab = document.getElementById(`conv-${id}`);
+            if(tab) tab.classList.add("conversa-ativa");
+            if (window.innerWidth <= 768) toggleMenu();
+            const res = await fetch(`/carregar_historico/${id}`);
+            const msgs = await res.json();
+            box.innerHTML = "";
+            msgs.forEach(m => appendMsg(m.content, m.role, true));
+            wrap.scrollTo(0, wrap.scrollHeight);
+        }
+
+        input.addEventListener("keypress", (e) => e.key === "Enter" && sendMessage());
+
+        async function sendMessage() {
+            const m = input.value.trim();
+            if(!m || !sessionAtual) return;
+            input.value = "";
+            appendMsg(m, "user", false);
+            const tempId = "ai-" + Date.now();
+            appendMsg("A processar tática...", "ai", false, tempId);
+            try {
+                const r = await fetch("/chat", {
+                    method: "POST", headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({mensagem: m, conversa_id: sessionAtual})
+                });
+                const d = await r.json();
+                const tempEl = document.getElementById(tempId);
+                if (tempEl) {
+                    tempEl.innerHTML = `<div class="ai-icon">✨</div><div class="ai-text">${marked.parse(d.resposta)}</div>`;
+                    setupCodeButtons();
+                    wrap.scrollTo({top: wrap.scrollHeight, behavior: 'smooth'});
+                }
+                carregarSidebar();
+            } catch (err) {
+                const tempEl = document.getElementById(tempId);
+                if (tempEl) tempEl.innerHTML = `<div class="ai-icon">❌</div><div class="ai-text">Erro de conexão.</div>`;
+            }
+        }
+
+        function appendMsg(txt, role, formatMarkdown = true, msgId = null) {
+            const div = document.createElement("div");
+            div.className = `msg-row ${role}-row`;
+            if (msgId) div.id = msgId;
+            if (role === "user") { div.innerHTML = `<div class="user-bubble">${txt}</div>`; } 
+            else {
+                let content = formatMarkdown ? marked.parse(txt) : txt;
+                div.innerHTML = `<div class="ai-icon">✨</div><div class="ai-text">${content}</div>`;
+            }
+            box.appendChild(div);
+            wrap.scrollTo({top: wrap.scrollHeight, behavior: 'smooth'});
+            setupCodeButtons();
+        }
+
+        function setupCodeButtons() {
+            document.querySelectorAll('pre').forEach(pre => {
+                if (pre.querySelector('.copy-btn')) return;
+                const btn = document.createElement('button');
+                btn.className = 'copy-btn';
+                btn.innerHTML = '📋 Copiar';
+                btn.onclick = async () => {
+                    const codeBlock = pre.querySelector('code');
+                    await navigator.clipboard.writeText(codeBlock.innerText);
+                    btn.innerHTML = '✅ Copiado!';
+                    setTimeout(() => { btn.innerHTML = '📋 Copiar'; }, 2000);
+                };
+                pre.appendChild(btn);
+            });
+        }
+    </script>
+</body>
+</html>
