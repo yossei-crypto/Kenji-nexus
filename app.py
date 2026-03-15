@@ -2,85 +2,110 @@ import os
 import sqlite3
 import requests
 import uuid
-from flask import Flask, render_template, request, jsonify, session, redirect
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'kenji_nexus_final_boss')
+# Chave secreta para manter as sessões seguras
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'kenji_nexus_ultra_secret_2026')
 
 # ==========================================
-# ⚙️ CONFIGURAÇÃO DE AMBIENTE
+# ⚙️ CONFIGURAÇÕES DE ELITE
 # ==========================================
-SENHA_MESTRA = "1234" 
+SENHA_MESTRA = "32442356" 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 def get_db():
-    # Isso garante que o banco funcione tanto no Render quanto no Kali
-    db_path = os.path.join(os.getcwd(), 'memoria_nexus.db')
+    # Define o caminho do banco de dados na raiz do projeto
+    db_path = os.path.join(os.getcwd(), 'nexus_intelligence.db')
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
     with get_db() as conn:
-        conn.execute('''CREATE TABLE IF NOT EXISTS conversas (id TEXT PRIMARY KEY, titulo TEXT, data DATETIME DEFAULT CURRENT_TIMESTAMP)''')
-        conn.execute('''CREATE TABLE IF NOT EXISTS mensagens (id INTEGER PRIMARY KEY AUTOINCREMENT, conversa_id TEXT, role TEXT, content TEXT)''')
+        conn.execute('''CREATE TABLE IF NOT EXISTS conversas 
+                        (id TEXT PRIMARY KEY, titulo TEXT, data DATETIME DEFAULT CURRENT_TIMESTAMP)''')
+        conn.execute('''CREATE TABLE IF NOT EXISTS mensagens 
+                        (id INTEGER PRIMARY KEY AUTOINCREMENT, conversa_id TEXT, role TEXT, content TEXT)''')
         conn.commit()
+
+# Inicializa o banco de dados ao ligar o sistema
 init_db()
 
 # ==========================================
-# 🧠 MOTOR TÁTICO
+# 🧠 MOTOR DE INTELIGÊNCIA (GROQ)
 # ==========================================
 class KenjiEngine:
     @staticmethod
-    def generate_text(prompt, history):
+    def generate_response(prompt, history):
         if not GROQ_API_KEY:
-            return "❌ ERRO: Chave API não configurada no Render (Environment Variables)."
+            return "⚠️ ERRO CRÍTICO: GROQ_API_KEY não detectada nas variáveis de ambiente do Render."
             
         url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
         
-        system_msg = {"role": "system", "content": "Você é o Kenji Nexus, IA de elite de @cybernmap. Seja direto, técnico e use blocos de código."}
+        # Personalidade do Kenji Nexus
+        system_prompt = {
+            "role": "system", 
+            "content": "Você é o Kenji Nexus, uma IA de elite criada por @cybernmap. Responda de forma técnica, direta e use estilo hacker/terminal. Use blocos de código sempre que necessário."
+        }
         
         payload = {
-            "model": "llama-3.3-70b-versatile", 
-            "messages": [system_msg] + history + [{"role": "user", "content": prompt}], 
-            "temperature": 0.6
+            "model": "llama-3.3-70b-versatile",
+            "messages": [system_prompt] + history + [{"role": "user", "content": prompt}],
+            "temperature": 0.7
         }
         
         try:
-            res = requests.post(url, headers=headers, json=payload, timeout=25)
+            res = requests.post(url, headers=headers, json=payload, timeout=30)
             return res.json()['choices'][0]['message']['content']
         except Exception as e:
-            return f"❌ Falha na conexão com a Groq: {str(e)}"
+            return f"❌ Falha na conexão neural: {str(e)}"
 
 # ==========================================
-# 🛣️ ROTAS (FIX DE ATUALIZAÇÃO)
+# 🛣️ ROTAS DE COMANDO
 # ==========================================
+
 @app.route("/")
 def index():
-    if not session.get("authorized"): return render_template("login.html")
+    if not session.get("authorized"):
+        return render_template("login.html")
     return render_template("index.html")
 
 @app.route("/login", methods=["POST"])
 def login():
-    if request.get_json().get("senha") == SENHA_MESTRA:
+    data = request.get_json()
+    if data.get("senha") == SENHA_MESTRA:
         session["authorized"] = True
         return jsonify({"status": "success"})
     return jsonify({"status": "denied"}), 401
 
+@app.route("/logout")
+def logout():
+    session.clear() # Limpa o acesso
+    return redirect("/") # Volta para o login
+
 @app.route("/chat", methods=["POST"])
 def chat():
-    if not session.get("authorized"): return jsonify({"error": "Unauthorized"}), 403
+    if not session.get("authorized"):
+        return jsonify({"error": "Acesso negado"}), 403
+        
     data = request.json
     user_msg = data.get("mensagem", "").strip()
     conversa_id = data.get("conversa_id")
 
+    # Recupera contexto recente da conversa
     with get_db() as conn:
-        cur = conn.execute("SELECT role, content FROM mensagens WHERE conversa_id = ? ORDER BY id DESC LIMIT 6", (conversa_id,))
+        cur = conn.execute("SELECT role, content FROM mensagens WHERE conversa_id = ? ORDER BY id DESC LIMIT 10", (conversa_id,))
         history = [{"role": r["role"], "content": r["content"]} for r in cur.fetchall()][::-1]
 
-    response_text = KenjiEngine.generate_text(user_msg, history)
+    # Gera resposta via IA
+    response_text = KenjiEngine.generate_response(user_msg, history)
 
+    # Salva no banco de dados
     with get_db() as conn:
         conn.execute("INSERT INTO mensagens (conversa_id, role, content) VALUES (?, ?, ?)", (conversa_id, "user", user_msg))
         conn.execute("INSERT INTO mensagens (conversa_id, role, content) VALUES (?, ?, ?)", (conversa_id, "assistant", response_text))
@@ -104,12 +129,14 @@ def carregar_historico(conversa_id):
 def nova_conversa():
     new_id = str(uuid.uuid4())[:8]
     with get_db() as conn:
-        conn.execute("INSERT INTO conversas (id, titulo) VALUES (?, ?)", (new_id, "Nova Missão"))
+        conn.execute("INSERT INTO conversas (id, titulo) VALUES (?, ?)", (new_id, f"Missão {new_id}"))
         conn.commit()
     return jsonify({"id": new_id})
 
-# CONFIGURAÇÃO DE PORTA DINÂMICA PARA O RENDER
+# ==========================================
+# 🚀 ATIVAÇÃO DO SERVIDOR
+# ==========================================
 if __name__ == "__main__":
-    # Esta linha é obrigatória para a nuvem funcionar
+    # Ajuste automático para o Render ou Local
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
