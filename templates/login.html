@@ -2,14 +2,14 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kenji IA — Acesso</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --bg: #050508;
-            --surface: rgba(18, 18, 26, 0.9);
+            --bg: #0a0a0f;
+            --surface: #12121a;
             --border: #1e1e2e;
             --accent: #00ff88;
             --accent-dim: #00cc6a;
@@ -19,7 +19,7 @@
         }
 
         body {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
@@ -29,12 +29,22 @@
             overflow: hidden;
         }
 
-        /* CANVAS DA MATRIX */
-        #matrix {
+        /* Fundo animado com grid */
+        body::before {
+            content: '';
             position: fixed;
-            top: 0; left: 0;
+            inset: 0;
+            background:
+                linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            animation: gridMove 20s linear infinite;
             z-index: 0;
-            opacity: 0.25;
+        }
+
+        @keyframes gridMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(40px, 40px); }
         }
 
         .login-container {
@@ -47,27 +57,41 @@
 
         .login-card {
             background: var(--surface);
-            backdrop-filter: blur(10px);
             border: 1px solid var(--border);
-            border-radius: 24px; /* Cantos arredondados profissionais */
+            border-radius: 16px;
             padding: 48px 36px;
-            box-shadow: 0 0 60px rgba(0,255,136,0.1);
+            box-shadow: 0 0 60px rgba(0,255,136,0.05);
+            transition: box-shadow 0.3s;
+        }
+
+        .logo {
             text-align: center;
+            margin-bottom: 36px;
         }
 
         .logo h1 {
-            font-size: 2.2rem;
+            font-size: 2rem;
+            font-weight: 700;
             color: var(--accent);
-            letter-spacing: 5px;
+            letter-spacing: 4px;
             text-transform: uppercase;
-            margin-bottom: 5px;
         }
 
         .logo p {
             color: var(--text-dim);
             font-size: 0.75rem;
+            margin-top: 8px;
             letter-spacing: 2px;
-            margin-bottom: 30px;
+        }
+
+        .terminal-line {
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            margin-bottom: 20px;
+        }
+
+        .terminal-line span {
+            color: var(--accent);
         }
 
         .input-group {
@@ -77,121 +101,99 @@
 
         .input-group input {
             width: 100%;
-            background: rgba(0,0,0,0.5);
+            background: var(--bg);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 16px;
+            border-radius: 10px;
+            padding: 14px 16px 14px 44px;
             color: var(--text);
-            text-align: center;
             font-family: inherit;
+            font-size: 0.95rem;
             outline: none;
-            transition: 0.3s;
+            transition: border-color 0.3s;
         }
 
         .input-group input:focus {
             border-color: var(--accent);
-            box-shadow: 0 0 15px rgba(0,255,136,0.2);
+            box-shadow: 0 0 0 3px rgba(0,255,136,0.1);
+        }
+
+        .input-group .icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-dim);
         }
 
         .btn-login {
             width: 100%;
-            padding: 16px;
+            padding: 14px;
             background: var(--accent);
-            color: #000;
+            color: var(--bg);
             border: none;
-            border-radius: 12px;
-            font-weight: 800;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 700;
             cursor: pointer;
-            text-transform: uppercase;
             letter-spacing: 2px;
+            text-transform: uppercase;
+            transition: 0.2s;
+        }
+
+        .btn-login:hover { background: var(--accent-dim); }
+
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            color: var(--text-dim);
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            line-height: 1.6;
+        }
+
+        /* ESTILO DO LINK DO INSTA */
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: bold;
             transition: 0.3s;
         }
 
-        .btn-login:hover { transform: translateY(-2px); box-shadow: 0 0 20px var(--accent); }
-
-        .footer {
-            margin-top: 25px;
-            color: var(--text-dim);
-            font-size: 0.7rem;
+        .footer a:hover {
+            color: #fff;
+            text-shadow: 0 0 10px var(--accent);
         }
 
-        #audio-info {
-            position: fixed;
-            bottom: 10px;
-            font-size: 10px;
-            opacity: 0.3;
-        }
+        .error-msg { color: var(--danger); font-size: 0.82rem; text-align: center; margin-top: 16px; }
     </style>
 </head>
-<body onclick="playMusic()">
-
-    <canvas id="matrix"></canvas>
-
+<body>
     <div class="login-container">
         <div class="login-card">
             <div class="logo">
                 <h1>Kenji IA</h1>
-                <p>@cybernmap | Neural System v2.0</p>
+                <p>Sistema Neural v2.0</p>
             </div>
-            
-            <form id="loginForm" onsubmit="doLogin(event)">
+            <div class="terminal-line">
+                <span>$</span> aguardando autenticação...
+            </div>
+            <form id="loginForm" onsubmit="return doLogin(event)">
                 <div class="input-group">
-                    <input type="password" id="senha" placeholder="DIGITE A SENHA MESTRA" required autocomplete="current-password">
+                    <span class="icon">&#128274;</span>
+                    <input type="password" id="senha" placeholder="Senha de acesso" required autofocus />
                 </div>
-                <button type="submit" class="btn-login" id="btnLogin">Acessar Terminal</button>
+                <button type="submit" class="btn-login" id="btnLogin">Acessar Sistema</button>
             </form>
-            
-            <div id="errorMsg" style="color: var(--danger); font-size: 12px; margin-top: 15px;"></div>
-
-            <div class="footer">
-                Desenvolvido por <b>@cybernmap</b>
-            </div>
+            <div class="error-msg" id="errorMsg"></div>
+        </div>
+        <div class="footer">
+            Kenji IA &mdash; Assistente Neural Avançado<br>
+            Desenvolvido por <a href="https://www.instagram.com/cybernmap" target="_blank">@cybernmap</a>
         </div>
     </div>
 
-    <div id="audio-info">AGUARDANDO INTERAÇÃO PARA ÁUDIO</div>
-
-    <audio id="bgMusic" loop>
-        <source src="/static/musica.mp3" type="audio/mpeg">
-    </audio>
-
     <script>
-        // --- MATRIX EFFECT ---
-        const canvas = document.getElementById('matrix');
-        const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*";
-        const fontSize = 16;
-        const columns = canvas.width / fontSize;
-        const drops = Array(Math.floor(columns)).fill(1);
-
-        function drawMatrix() {
-            ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#00ff88";
-            ctx.font = fontSize + "px monospace";
-            for (let i = 0; i < drops.length; i++) {
-                const text = chars[Math.floor(Math.random() * chars.length)];
-                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
-                drops[i]++;
-            }
-        }
-        setInterval(drawMatrix, 50);
-
-        // --- MUSIC LOGIC ---
-        let audioPlay = false;
-        function playMusic() {
-            if (!audioPlay) {
-                const music = document.getElementById('bgMusic');
-                music.play().catch(() => {});
-                document.getElementById('audio-info').innerText = "AUDIO SYSTEM: ONLINE";
-                audioPlay = true;
-            }
-        }
-
-        // --- LOGIN LOGIC ---
         async function doLogin(e) {
             e.preventDefault();
             const btn = document.getElementById('btnLogin');
@@ -199,7 +201,8 @@
             const senha = document.getElementById('senha').value;
 
             btn.disabled = true;
-            btn.textContent = 'AUTENTICANDO...';
+            btn.textContent = 'Conectando...';
+            errEl.textContent = '';
 
             try {
                 const res = await fetch('/login', {
@@ -211,14 +214,14 @@
                 if (res.ok && data.status === 'ok') {
                     window.location.href = '/';
                 } else {
-                    errEl.textContent = 'ACESSO NEGADO, OPERADOR.';
+                    errEl.textContent = data.msg || 'Acesso negado.';
                     btn.disabled = false;
-                    btn.textContent = 'ACESSAR TERMINAL';
+                    btn.textContent = 'Acessar Sistema';
                 }
             } catch (err) {
-                errEl.textContent = 'FALHA NA CONEXÃO NEURAL.';
+                errEl.textContent = 'Falha na conexão com o servidor.';
                 btn.disabled = false;
-                btn.textContent = 'ACESSAR TERMINAL';
+                btn.textContent = 'Acessar Sistema';
             }
         }
     </script>
