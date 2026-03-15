@@ -33,7 +33,7 @@ def index():
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
-    if data.get("senha") == "1234":
+    if data.get("senha") == "32442356":
         session["auth"] = True
         return jsonify({"status": "ok"})
     return jsonify({"status": "erro"}), 401
