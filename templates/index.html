@@ -1,223 +1,152 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="dark">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Kenji Nexus | Command Center</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg: #050505;
-            --sidebar-bg: #000000;
-            --panel-bg: rgba(15, 15, 15, 0.95);
-            --accent: #00e5ff;
-            --accent-glow: rgba(0, 229, 255, 0.3);
-            --text: #e0e0e0;
-            --border: #1a1a1a;
-            --user-bubble: #1a1a1a;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        :root { --bg: #050505; --accent: #00e5ff; --panel: #0a0a0a; --text: #e0e0e0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         
-        body { 
-            background: var(--bg); 
-            color: var(--text); 
-            height: 100dvh; 
-            width: 100vw;
-            display: flex; 
-            overflow: hidden; 
+        body, html { 
+            height: 100%; width: 100%; overflow: hidden; 
+            background: var(--bg); font-family: 'Inter', sans-serif;
+            position: fixed;
         }
 
-        /* BARRA LATERAL TÁTICA */
-        #sidebar { 
-            width: 280px; 
-            background: var(--sidebar-bg); 
-            border-right: 1px solid var(--border); 
-            display: flex; 
-            flex-direction: column;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1000;
+        /* EFEITO GLITCH NO NOME */
+        .glitch {
+            font-weight: 900; font-size: 1.2rem; color: var(--accent);
+            letter-spacing: 3px; position: relative; text-transform: uppercase;
+            animation: glitch-anim 3s infinite linear alternate-reverse;
+        }
+        @keyframes glitch-anim {
+            0% { text-shadow: 2px 0 red, -2px 0 blue; transform: skew(0deg); }
+            5% { text-shadow: -2px 0 red, 2px 0 blue; transform: skew(1deg); }
+            10% { text-shadow: 2px 0 red, -2px 0 blue; transform: skew(0deg); }
+            100% { text-shadow: none; transform: skew(0deg); }
         }
 
-        .sidebar-header { padding: 25px 20px; border-bottom: 1px solid var(--border); }
-        
-        .new-chat-btn {
-            width: 100%; 
-            padding: 14px; 
-            background: transparent; 
-            border: 1px solid var(--accent);
-            color: var(--accent); 
-            border-radius: 4px; 
-            cursor: pointer; 
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            box-shadow: 0 0 10px var(--accent-glow);
+        header {
+            position: fixed; top: 0; left: 0; right: 0; height: 65px;
+            background: rgba(0,0,0,0.9); border-bottom: 1px solid #1a1a1a;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 20px; z-index: 100; backdrop-filter: blur(10px);
         }
 
-        #historico { flex: 1; overflow-y: auto; padding: 15px; }
-        .conv-item { 
-            padding: 15px; 
-            border-radius: 6px; 
-            cursor: pointer; 
-            font-size: 0.85rem; 
-            color: #888; 
-            margin-bottom: 8px;
-            border: 1px solid transparent;
+        #sidebar {
+            position: fixed; top: 0; left: 0; bottom: 0; width: 280px;
+            background: #000; z-index: 200; transform: translateX(-100%);
+            transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+            border-right: 1px solid #1a1a1a; display: flex; flex-direction: column;
         }
-        .conv-item:hover { background: #111; color: var(--text); }
-        .ativa { 
-            background: rgba(0, 229, 255, 0.05); 
-            border-color: var(--accent); 
-            color: var(--accent); 
-            font-weight: bold;
+        #sidebar.open { transform: translateX(0); box-shadow: 10px 0 30px rgba(0,0,0,0.8); }
+
+        /* ÁREA DE CHAT */
+        #chat-wrapper {
+            position: absolute; top: 65px; bottom: 85px; left: 0; right: 0;
+            overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 25px;
+            scroll-behavior: smooth;
         }
 
-        /* ÁREA CENTRAL */
-        #main-command { 
-            flex: 1; 
-            display: flex; 
-            flex-direction: column; 
-            background: radial-gradient(circle at top right, #0a1114, #050505);
-        }
+        .msg { max-width: 85%; padding: 15px; border-radius: 12px; font-size: 14px; line-height: 1.6; }
+        .user { align-self: flex-end; background: #111; border: 1px solid #222; border-bottom-right-radius: 2px; }
+        .ai { align-self: flex-start; border-left: 2px solid var(--accent); width: 100%; background: rgba(0,229,255,0.02); }
 
-        header { 
-            height: 70px;
-            padding: 0 25px; 
-            border-bottom: 1px solid var(--border); 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center;
-            background: rgba(0,0,0,0.4);
-            backdrop-filter: blur(10px);
+        /* INPUT AREA */
+        .input-zone {
+            position: fixed; bottom: 0; left: 0; right: 0; height: 85px;
+            background: #000; border-top: 1px solid #1a1a1a; padding: 15px;
+            padding-bottom: env(safe-area-inset-bottom);
         }
+        .input-shell {
+            background: #0d0d0d; border: 1px solid #222; border-radius: 15px;
+            display: flex; align-items: center; padding: 0 15px; height: 100%;
+        }
+        input { flex: 1; background: transparent; border: none; color: #fff; font-size: 16px; outline: none; }
+        .send-btn { color: var(--accent); font-size: 22px; cursor: pointer; background: none; border: none; }
 
-        .logo { font-weight: 800; letter-spacing: 3px; color: var(--accent); font-size: 1.2rem; }
-        .user-tag { color: #555; font-size: 0.8rem; font-weight: bold; }
-
-        /* CHAT FLUXO */
-        #chat-wrapper { flex: 1; overflow-y: auto; padding: 25px; display: flex; flex-direction: column; gap: 30px; }
-        
-        .message { max-width: 90%; line-height: 1.6; font-size: 0.95rem; animation: slideIn 0.3s ease-out; }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-
-        .user-msg { align-self: flex-end; background: var(--user-bubble); padding: 15px 20px; border-radius: 20px 20px 0 20px; color: #fff; border: 1px solid #333; }
-        
-        .ai-msg { align-self: flex-start; width: 100%; border-left: 2px solid var(--accent); padding-left: 20px; margin-bottom: 10px; }
-        .ai-msg code { font-family: 'JetBrains Mono', monospace; color: var(--accent); background: #000; padding: 2px 6px; border-radius: 4px; }
-        
-        pre { 
-            background: #000; 
-            padding: 20px; 
-            border-radius: 8px; 
-            margin: 15px 0; 
-            overflow-x: auto; 
-            border: 1px solid var(--border);
-            position: relative;
+        /* OVERLAY PARA O SWIPE */
+        #overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            display: none; z-index: 150; opacity: 0; transition: 0.3s;
         }
-
-        /* INPUT TÁTICO */
-        .input-zone { padding: 30px 25px; background: transparent; }
-        .input-shell { 
-            max-width: 900px; 
-            margin: 0 auto; 
-            display: flex; 
-            background: var(--panel-bg); 
-            border: 1px solid var(--border); 
-            border-radius: 12px; 
-            padding: 10px 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-        input { 
-            flex: 1; 
-            background: transparent; 
-            border: none; 
-            color: #fff; 
-            padding: 12px; 
-            outline: none; 
-            font-size: 1rem; 
-        }
-        .send-btn { 
-            background: none; 
-            border: none; 
-            color: var(--accent); 
-            font-size: 1.5rem; 
-            cursor: pointer; 
-            padding: 0 10px;
-        }
-
-        /* MOBILE FIX */
-        @media (max-width: 768px) {
-            #sidebar { position: absolute; height: 100%; transform: translateX(-100%); }
-            #sidebar.open { transform: translateX(0); }
-            .logo { font-size: 1rem; }
-        }
+        #overlay.active { display: block; opacity: 1; }
     </style>
 </head>
 <body>
 
+    <div id="overlay" onclick="toggleSidebar()"></div>
+
     <div id="sidebar">
-        <div class="sidebar-header">
-            <button class="new-chat-btn" onclick="novaMissao()">+ Nova Missão</button>
+        <div style="padding: 30px 20px; border-bottom: 1px solid #1a1a1a;">
+            <button onclick="novaMissao()" style="width:100%; padding:15px; background:var(--accent); color:#000; border:none; border-radius:8px; font-weight:900;">+ NOVA MISSÃO</button>
         </div>
-        <div id="historico"></div>
-        <div style="padding: 20px; border-top: 1px solid var(--border);">
-            <button onclick="toggleTheme()" style="width: 100%; background: #111; color: #555; border: none; padding: 10px; border-radius: 4px; font-size: 0.7rem; cursor: pointer;">SISTEMA v2.0</button>
+        <div id="historico" style="flex:1; overflow-y:auto; padding:10px;"></div>
+        <div style="padding:20px; text-align:center; opacity:0.3; font-size:10px;">SISTEMA NEXUS v3.0</div>
+    </div>
+
+    <header>
+        <button onclick="toggleSidebar()" style="background:none; border:none; color:var(--accent); font-size:26px;">☰</button>
+        <div class="glitch">Kenji Nexus</div>
+        <a href="https://instagram.com/cybernmap" target="_blank" style="color:var(--accent); text-decoration:none; font-size:12px; font-weight:bold;">@cybernmap</a>
+        <button onclick="location.href='/logout'" style="background:none; border:1px solid #ff3e3e; color:#ff3e3e; padding:5px 12px; border-radius:5px; font-size:10px; font-weight:bold;">SAIR</button>
+    </header>
+
+    <div id="chat-wrapper"></div>
+
+    <div class="input-zone">
+        <div class="input-shell">
+            <input type="text" id="user-input" placeholder="Aguardando comando..." autocomplete="off">
+            <button class="send-btn" onclick="enviar()">➤</button>
         </div>
     </div>
 
-    <main id="main-command">
-        <header>
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <button onclick="document.getElementById('sidebar').classList.toggle('open')" style="background:none; border:none; color:var(--accent); font-size: 1.5rem; cursor: pointer; display: block;">☰</button>
-                <div class="logo">KENJI NEXUS</div>
-            </div>
-            <div style="display: flex; gap: 20px; align-items: center;">
-                <span class="user-tag">@cybernmap</span>
-                <button onclick="location.href='/logout'" style="color: #ff3e3e; background: none; border: 1px solid #ff3e3e33; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;">SAIR</button>
-            </div>
-        </header>
-
-        <div id="chat-wrapper">
-            </div>
-
-        <div class="input-zone">
-            <div class="input-shell">
-                <input type="text" id="user-input" placeholder="Aguardando comando..." autocomplete="off">
-                <button class="send-btn" onclick="enviar()">➤</button>
-            </div>
-        </div>
-    </main>
-
     <script>
         let convId = null;
+        let touchStartX = 0;
+
+        function toggleSidebar() {
+            const sb = document.getElementById('sidebar');
+            const ov = document.getElementById('overlay');
+            sb.classList.toggle('open');
+            ov.classList.toggle('active');
+        }
+
+        // DETECÇÃO DE SWIPE (ARRASTAR)
+        document.addEventListener('touchstart', e => touchStartX = e.changedTouches[0].screenX);
+        document.addEventListener('touchend', e => {
+            let touchEndX = e.changedTouches[0].screenX;
+            if (touchEndX - touchStartX > 80) toggleSidebar(); // Arrastar para direita abre
+            if (touchStartX - touchEndX > 80) { // Arrastar para esquerda fecha
+                if (document.getElementById('sidebar').classList.contains('open')) toggleSidebar();
+            }
+        });
 
         async function carregarSidebar() {
             const res = await fetch('/carregar_conversas');
             const data = await res.json();
             const div = document.getElementById('historico');
-            div.innerHTML = '';
-            data.forEach(c => {
-                const item = document.createElement('div');
-                item.className = `conv-item ${convId === c.id ? 'ativa' : ''}`;
-                item.innerText = c.titulo;
-                item.onclick = () => carregarChat(c.id);
-                div.appendChild(item);
-            });
+            div.innerHTML = data.map(c => `
+                <div onclick="carregarChat('${c.id}')" style="padding:15px; color:#666; border-bottom:1px solid #0a0a0a; font-size:13px;">
+                    > ${c.titulo}
+                </div>
+            `).join('');
         }
 
         async function novaMissao() {
             const res = await fetch('/nova_conversa', {method: 'POST'});
             const data = await res.json();
             convId = data.id;
-            await carregarSidebar();
-            carregarChat(data.id);
+            document.getElementById('chat-wrapper').innerHTML = '';
+            if(document.getElementById('sidebar').classList.contains('open')) toggleSidebar();
+            carregarSidebar();
         }
 
         async function carregarChat(id) {
             convId = id;
-            if (window.innerWidth < 768) document.getElementById('sidebar').classList.remove('open');
+            if(document.getElementById('sidebar').classList.contains('open')) toggleSidebar();
             const res = await fetch(`/carregar_historico/${id}`);
             const msgs = await res.json();
             const box = document.getElementById('chat-wrapper');
@@ -226,14 +155,14 @@
             carregarSidebar();
         }
 
-        function addBubble(txt, role, tempId = null) {
+        function addBubble(txt, role, tId = null) {
             const box = document.getElementById('chat-wrapper');
             const div = document.createElement('div');
-            if(tempId) div.id = tempId;
-            div.className = `message ${role === 'user' ? 'user-msg' : 'ai-msg'}`;
+            if(tId) div.id = tId;
+            div.className = `msg ${role === 'user' ? 'user' : 'ai'}`;
             div.innerHTML = role === 'assistant' ? marked.parse(txt) : txt;
             box.appendChild(div);
-            box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+            box.scrollTop = box.scrollHeight;
         }
 
         async function enviar() {
@@ -242,10 +171,8 @@
             if(!val || !convId) return;
             inp.value = '';
             addBubble(val, 'user');
-
-            const tId = "loading-" + Date.now();
-            addBubble("<i>Sincronizando com Nexus...</i>", "assistant", tId);
-
+            const tId = "L-" + Date.now();
+            addBubble("<i>Sincronizando...</i>", "assistant", tId);
             const res = await fetch('/chat', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
