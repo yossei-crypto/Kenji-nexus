@@ -41,10 +41,10 @@
         @keyframes scan { from { top: -120px; } to { top: 100vh; } }
 
         /* ── MUSIC BTN ── */
-        #music-btn { position: fixed; bottom: 20px; left: 20px; z-index: 500; width: 42px; height: 42px; border-radius: 50%; background: rgba(0,255,136,0.1); border: 1px solid var(--border-strong); color: var(--green); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; backdrop-filter: blur(8px); }
-        #music-btn:hover { background: rgba(0,255,136,0.2); box-shadow: 0 0 20px var(--green-glow); }
-        #music-btn.playing { animation: musicPulse 1.2s ease-in-out infinite; }
-        @keyframes musicPulse { 0%,100% { box-shadow: 0 0 8px rgba(0,255,136,0.3); } 50% { box-shadow: 0 0 24px rgba(0,255,136,0.7); } }
+        #music-btn { flex-shrink: 0; width: 34px; height: 34px; border-radius: 8px; background: none; border: 1px solid var(--border); color: var(--green); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        #music-btn:hover { background: var(--green-dim); border-color: var(--green); }
+        #music-btn.playing { background: var(--green-dim); border-color: var(--green); animation: musicPulse 1.2s ease-in-out infinite; }
+        @keyframes musicPulse { 0%,100% { box-shadow: 0 0 6px rgba(0,255,136,0.3); } 50% { box-shadow: 0 0 14px rgba(0,255,136,0.6); } }
 
         /* ── LAYOUT ── */
         #app  { display: flex; height: 100dvh; position: relative; z-index: 10; }
@@ -180,8 +180,7 @@
 <!-- YouTube player oculto -->
 <div id="yt-player" style="position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;pointer-events:none;"></div>
 
-<!-- Botão música -->
-<button id="music-btn" onclick="toggleMusic()" title="Música">🎵</button>
+
 
 <div id="overlay" onclick="closeSidebar()"></div>
 
@@ -218,6 +217,7 @@
 
         <div id="input-zone">
             <div id="input-row">
+                <button id="music-btn" onclick="toggleMusic()" title="Música">🎵</button>
                 <div id="img-preview-wrap">
                     <img id="img-preview" alt="preview">
                     <button id="img-remove" onclick="removeImage()" aria-label="Remover imagem">✕</button>
