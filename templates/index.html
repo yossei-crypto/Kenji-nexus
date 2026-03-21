@@ -41,7 +41,7 @@
         @keyframes scan { from { top: -120px; } to { top: 100vh; } }
 
         /* ── MUSIC BTN ── */
-        #music-btn { position: fixed; bottom: 20px; right: 20px; z-index: 500; width: 42px; height: 42px; border-radius: 50%; background: rgba(0,255,136,0.1); border: 1px solid var(--border-strong); color: var(--green); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; backdrop-filter: blur(8px); }
+        #music-btn { position: fixed; bottom: 20px; left: 20px; z-index: 500; width: 42px; height: 42px; border-radius: 50%; background: rgba(0,255,136,0.1); border: 1px solid var(--border-strong); color: var(--green); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; backdrop-filter: blur(8px); }
         #music-btn:hover { background: rgba(0,255,136,0.2); box-shadow: 0 0 20px var(--green-glow); }
         #music-btn.playing { animation: musicPulse 1.2s ease-in-out infinite; }
         @keyframes musicPulse { 0%,100% { box-shadow: 0 0 8px rgba(0,255,136,0.3); } 50% { box-shadow: 0 0 24px rgba(0,255,136,0.7); } }
@@ -227,7 +227,7 @@
                 <input type="file" id="img-input" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" onchange="onImageSelected(this)">
                 <button id="send-btn" onclick="env()" aria-label="Enviar">➤</button>
             </div>
-            <div id="char-hint">Enter para enviar · Shift+Enter para nova linha · 🖼 para imagem</div>
+    
         </div>
     </div>
 </div>
@@ -543,9 +543,11 @@ function addMsgTypewriter(text, role) {
         return base + rand;
     }
 
+    // Contador para não tocar som em CADA token (evita saturação)
+    let soundTick = 0;
+
     function typeNext() {
         if (i >= tokens.length) {
-            // Finaliza: renderiza markdown completo e remove cursor
             cursor.remove();
             msg.innerHTML = marked.parse(text);
             addCopyButtons(msg);
@@ -553,14 +555,23 @@ function addMsgTypewriter(text, role) {
             return;
         }
 
-        built += tokens[i++];
+        const token = tokens[i++];
+        built += token;
 
-        // Renderiza o markdown parcial com cursor no final
         msg.innerHTML = marked.parse(built);
         msg.appendChild(cursor);
         chat.scrollTop = chat.scrollHeight;
 
-        // Pausa maior em pontuação (simula ritmo natural)
+        // Som de teclado a cada 2 tokens
+        soundTick++;
+        if (soundTick % 2 === 0) {
+            const t = token.trim().slice(-1);
+            if (['.','!','?'].includes(t))  playKeyClick('enter');
+            else if (t === '\n')           playKeyClick('backspace');
+            else if (token.trim().length > 0) playKeyClick('normal');
+        }
+
+        // Pausa maior em pontuação
         const lastChar  = built.trim().slice(-1);
         const pauseChar = ['.','!','?','\n'].includes(lastChar);
         setTimeout(typeNext, pauseChar ? getDelay() * 4 : getDelay());
@@ -657,6 +668,89 @@ async function env() {
     }
 }
 
+// ===========================================
+// KEYBOARD SOUND (Web Audio API)
+// ===========================================
+let audioCtx = null;
+
+function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+}
+
+function playKeyClick(type = 'normal') {
+    try {
+        const ctx = getAudioCtx();
+
+        // Oscilador principal (click mecânico)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        // Filtro passa-banda para textura de teclado mecânico
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+
+        if (type === 'enter') {
+            // Enter: som mais grave e profundo
+            osc.frequency.setValueAtTime(180, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.08);
+            filter.frequency.value = 400;
+            filter.Q.value = 2;
+            gain.gain.setValueAtTime(0.18, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+        } else if (type === 'backspace') {
+            // Backspace: som médio
+            osc.frequency.setValueAtTime(300, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.06);
+            filter.frequency.value = 600;
+            filter.Q.value = 1.5;
+            gain.gain.setValueAtTime(0.12, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.09);
+        } else {
+            // Tecla normal: click seco e rápido
+            // Frequência aleatória leve para variar o som
+            const baseFreq = 800 + Math.random() * 400;
+            osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.04);
+            filter.frequency.value = 2000;
+            filter.Q.value = 1;
+            gain.gain.setValueAtTime(0.08, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+        }
+
+        osc.type = 'square';
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.15);
+
+        // Noise burst para simular o "clack" mecânico
+        const bufferSize = ctx.sampleRate * 0.04;
+        const buffer     = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data       = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1);
+
+        const noise     = ctx.createBufferSource();
+        const noiseGain = ctx.createGain();
+        const noiseFilter = ctx.createBiquadFilter();
+
+        noise.buffer = buffer;
+        noiseFilter.type = 'highpass';
+        noiseFilter.frequency.value = type === 'enter' ? 800 : 3000;
+
+        noiseGain.gain.setValueAtTime(type === 'enter' ? 0.12 : 0.06, ctx.currentTime);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(ctx.destination);
+        noise.start(ctx.currentTime);
+
+    } catch (e) { /* silently fail se audio bloqueado */ }
+}
+
 // ── Textarea ──
 const inp = document.getElementById('inp');
 inp.addEventListener('input', () => {
@@ -664,7 +758,16 @@ inp.addEventListener('input', () => {
     inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
 });
 inp.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); env(); }
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        playKeyClick('enter');
+        env();
+    } else if (e.key === 'Backspace' || e.key === 'Delete') {
+        playKeyClick('backspace');
+    } else if (e.key.length === 1) {
+        // Só toca em teclas de caractere (evita Shift, Ctrl, etc.)
+        playKeyClick('normal');
+    }
 });
 
 // Colar imagem do clipboard
