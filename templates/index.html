@@ -562,13 +562,12 @@ function addMsgTypewriter(text, role) {
         msg.appendChild(cursor);
         chat.scrollTop = chat.scrollHeight;
 
-        // Som de teclado a cada 2 tokens
+        // Som de teclado a cada 3 tokens para não saturar
         soundTick++;
-        if (soundTick % 2 === 0) {
+        if (soundTick % 3 === 0 && token.trim().length > 0) {
             const t = token.trim().slice(-1);
             if (['.','!','?'].includes(t))  playKeyClick('enter');
-            else if (t === '\n')           playKeyClick('backspace');
-            else if (token.trim().length > 0) playKeyClick('normal');
+            else                            playKeyClick('normal');
         }
 
         // Pausa maior em pontuação
@@ -669,7 +668,7 @@ async function env() {
 }
 
 // ===========================================
-// KEYBOARD SOUND (Web Audio API)
+// KEYBOARD SOUND — suave e realista
 // ===========================================
 let audioCtx = null;
 
@@ -680,75 +679,48 @@ function getAudioCtx() {
 
 function playKeyClick(type = 'normal') {
     try {
-        const ctx = getAudioCtx();
+        const ctx  = getAudioCtx();
+        const now  = ctx.currentTime;
 
-        // Oscilador principal (click mecânico)
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
+        // Mastervolume baixo e suave
+        const master = ctx.createGain();
+        master.gain.setValueAtTime(type === 'enter' ? 0.06 : 0.035, now);
+        master.connect(ctx.destination);
 
-        // Filtro passa-banda para textura de teclado mecânico
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'bandpass';
-
-        if (type === 'enter') {
-            // Enter: som mais grave e profundo
-            osc.frequency.setValueAtTime(180, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.08);
-            filter.frequency.value = 400;
-            filter.Q.value = 2;
-            gain.gain.setValueAtTime(0.18, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
-        } else if (type === 'backspace') {
-            // Backspace: som médio
-            osc.frequency.setValueAtTime(300, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.06);
-            filter.frequency.value = 600;
-            filter.Q.value = 1.5;
-            gain.gain.setValueAtTime(0.12, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.09);
-        } else {
-            // Tecla normal: click seco e rápido
-            // Frequência aleatória leve para variar o som
-            const baseFreq = 800 + Math.random() * 400;
-            osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.04);
-            filter.frequency.value = 2000;
-            filter.Q.value = 1;
-            gain.gain.setValueAtTime(0.08, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+        // --- Clique suave com noise curto ---
+        const bufLen = Math.floor(ctx.sampleRate * 0.018); // 18ms
+        const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+        const data   = buf.getChannelData(0);
+        for (let i = 0; i < bufLen; i++) {
+            // envelope: ataque instantâneo, decay suave
+            const env = Math.pow(1 - i / bufLen, 2.5);
+            data[i]   = (Math.random() * 2 - 1) * env;
         }
 
-        osc.type = 'square';
-        osc.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
+        const noise = ctx.createBufferSource();
+        noise.buffer = buf;
 
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.15);
+        // Filtro: tecla normal = highpass (som seco), enter = bandpass (mais corpo)
+        const filter = ctx.createBiquadFilter();
+        if (type === 'enter') {
+            filter.type            = 'bandpass';
+            filter.frequency.value = 1200;
+            filter.Q.value         = 0.8;
+        } else if (type === 'backspace') {
+            filter.type            = 'bandpass';
+            filter.frequency.value = 1800;
+            filter.Q.value         = 0.6;
+        } else {
+            filter.type            = 'highpass';
+            filter.frequency.value = 2500 + Math.random() * 800;
+            filter.Q.value         = 0.5;
+        }
 
-        // Noise burst para simular o "clack" mecânico
-        const bufferSize = ctx.sampleRate * 0.04;
-        const buffer     = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data       = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1);
+        noise.connect(filter);
+        filter.connect(master);
+        noise.start(now);
 
-        const noise     = ctx.createBufferSource();
-        const noiseGain = ctx.createGain();
-        const noiseFilter = ctx.createBiquadFilter();
-
-        noise.buffer = buffer;
-        noiseFilter.type = 'highpass';
-        noiseFilter.frequency.value = type === 'enter' ? 800 : 3000;
-
-        noiseGain.gain.setValueAtTime(type === 'enter' ? 0.12 : 0.06, ctx.currentTime);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
-
-        noise.connect(noiseFilter);
-        noiseFilter.connect(noiseGain);
-        noiseGain.connect(ctx.destination);
-        noise.start(ctx.currentTime);
-
-    } catch (e) { /* silently fail se audio bloqueado */ }
+    } catch (e) { /* silently fail */ }
 }
 
 // ── Textarea ──
