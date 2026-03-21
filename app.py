@@ -264,6 +264,49 @@ def chat():
     return jsonify({"resposta": resposta})
 
 # ── Demais rotas ──────────────────────────────────────────────────────────────
+# ── Rota: transcrição de áudio (Groq Whisper) ────────────────────────────────
+@app.route("/transcrever", methods=["POST"])
+@login_required
+def transcrever():
+    ip = request.remote_addr
+    if is_rate_limited(f"audio:{ip}", max_calls=10, window=60):
+        return jsonify({"error": "Limite de transcrições atingido."}), 429
+
+    audio_file = request.files.get("audio")
+    cid        = (request.form.get("conversa_id") or "").strip()
+
+    if not audio_file:
+        return jsonify({"error": "Arquivo de áudio não enviado."}), 400
+
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        return jsonify({"error": "Serviço indisponível."}), 503
+
+    try:
+        # Envia para Groq Whisper
+        res = requests.post(
+            "https://api.groq.com/openai/v1/audio/transcriptions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            files={"file": ("audio.webm", audio_file.read(), "audio/webm")},
+            data={"model": "whisper-large-v3", "language": "pt", "response_format": "json"},
+            timeout=30,
+        )
+        res.raise_for_status()
+        texto = res.json().get("text", "").strip()
+
+        if not texto:
+            return jsonify({"error": "Não consegui entender o áudio. Tente novamente."}), 422
+
+        log.info("Áudio transcrito: %s chars", len(texto))
+        return jsonify({"texto": texto})
+
+    except requests.Timeout:
+        return jsonify({"error": "Timeout na transcrição. Tente novamente."}), 504
+    except requests.HTTPError as e:
+        log.error("Erro Whisper: %s", e)
+        return jsonify({"error": "Erro ao transcrever áudio."}), 502
+
+
 @app.route("/nova_conversa", methods=["POST"])
 @login_required
 def nova():
