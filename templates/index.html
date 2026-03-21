@@ -154,13 +154,17 @@
         #img-remove.visible { display: flex; }
 
         /* buttons */
-        #img-btn { flex-shrink: 0; width: 34px; height: 34px; background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
-        #img-btn:hover { color: var(--green); border-color: var(--green); background: var(--green-dim); }
-        #send-btn { flex-shrink: 0; width: 34px; height: 34px; background: var(--green); border: none; border-radius: 8px; color: #000; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-weight: bold; }
+        .tool-btn { flex-shrink: 0; width: 34px; height: 34px; background: rgba(0,255,136,0.05); border: 1px solid var(--border); border-radius: 8px; color: #aaa; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .tool-btn:hover { color: var(--green); border-color: var(--green); background: var(--green-dim); }
+        .tool-btn svg { width: 17px; height: 17px; stroke-width: 1.8px; }
+        #audio-btn { color: #aaa; }
+        #audio-btn.recording { color: var(--red) !important; border-color: var(--red) !important; background: rgba(255,68,102,0.12) !important; animation: recPulse 1s ease-in-out infinite; }
+        @keyframes recPulse { 0%,100% { box-shadow: 0 0 0 rgba(255,68,102,0.4); } 50% { box-shadow: 0 0 12px rgba(255,68,102,0.7); } }
+        #send-btn { flex-shrink: 0; width: 36px; height: 36px; background: var(--green); border: none; border-radius: 8px; color: #000; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
         #send-btn:hover { box-shadow: 0 0 16px var(--green-glow); transform: scale(1.05); }
         #send-btn:active { transform: scale(0.95); }
         #send-btn:disabled { opacity: 0.3; cursor: default; transform: none; box-shadow: none; }
-        #char-hint { text-align: right; font-size: 9px; color: var(--text-dim); margin-top: 6px; letter-spacing: 0.5px; }
+        #send-btn svg { width: 16px; height: 16px; }
 
         /* toast */
         #toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: #1a0a0f; border: 1px solid var(--red); color: var(--red); padding: 10px 20px; border-radius: 8px; font-size: 12px; opacity: 0; transition: all 0.3s; pointer-events: none; white-space: nowrap; z-index: 500; }
@@ -217,15 +221,43 @@
 
         <div id="input-zone">
             <div id="input-row">
-                <button id="music-btn" onclick="toggleMusic()" title="Música">🎵</button>
+                <button id="music-btn" class="tool-btn" onclick="toggleMusic()" title="Música">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 18V5l12-2v13"/>
+                        <circle cx="6" cy="18" r="3"/>
+                        <circle cx="18" cy="16" r="3"/>
+                    </svg>
+                </button>
                 <div id="img-preview-wrap">
                     <img id="img-preview" alt="preview">
                     <button id="img-remove" onclick="removeImage()" aria-label="Remover imagem">✕</button>
                 </div>
                 <textarea id="inp" placeholder="Aguardando comando..." rows="1" autocomplete="off"></textarea>
-                <button id="img-btn" onclick="document.getElementById('img-input').click()" aria-label="Anexar imagem" title="Enviar imagem">🖼</button>
+                <!-- Botão imagem -->
+                <button id="img-btn" class="tool-btn" onclick="document.getElementById('img-input').click()" aria-label="Anexar imagem" title="Enviar imagem">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="3"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                </button>
                 <input type="file" id="img-input" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" onchange="onImageSelected(this)">
-                <button id="send-btn" onclick="env()" aria-label="Enviar">➤</button>
+                <!-- Botão áudio -->
+                <button id="audio-btn" class="tool-btn" onclick="toggleRecording()" aria-label="Gravar áudio" title="Gravar áudio">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="2" width="6" height="12" rx="3"/>
+                        <path d="M5 10a7 7 0 0014 0"/>
+                        <line x1="12" y1="19" x2="12" y2="22"/>
+                        <line x1="9" y1="22" x2="15" y2="22"/>
+                    </svg>
+                </button>
+                <!-- Botão enviar -->
+                <button id="send-btn" onclick="env()" aria-label="Enviar">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"/>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                    </svg>
+                </button>
             </div>
     
         </div>
@@ -762,6 +794,88 @@ inp.addEventListener('paste', e => {
         }
     }
 });
+
+// ===========================================
+// GRAVAÇÃO DE ÁUDIO + TRANSCRIÇÃO WHISPER
+// ===========================================
+let mediaRecorder = null;
+let audioChunks   = [];
+let isRecording   = false;
+
+async function toggleRecording() {
+    if (isRecording) {
+        // Para gravação
+        mediaRecorder.stop();
+        return;
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks  = [];
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+
+        mediaRecorder.onstop = async () => {
+            isRecording = false;
+            const btn   = document.getElementById('audio-btn');
+            btn.classList.remove('recording');
+            stream.getTracks().forEach(t => t.stop());
+
+            // Converte para blob e envia para transcrição
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            await transcribeAudio(blob);
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        document.getElementById('audio-btn').classList.add('recording');
+        showToast('🎙️ Gravando... toque novamente para parar');
+
+    } catch (err) {
+        showToast('Microfone não disponível');
+    }
+}
+
+async function transcribeAudio(blob) {
+    if (!cid) return;
+    document.getElementById('typing').classList.add('visible');
+    document.getElementById('send-btn').disabled = true;
+
+    try {
+        const form = new FormData();
+        form.append('audio', blob, 'audio.webm');
+        form.append('conversa_id', cid);
+
+        const res = await fetch('/transcrever', { method: 'POST', body: form });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const d = await res.json();
+
+        if (d.error) { showToast(d.error); return; }
+
+        // Coloca o texto transcrito no input
+        if (d.texto) {
+            const inp = document.getElementById('inp');
+            inp.value = d.texto;
+            inp.style.height = 'auto';
+            inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+            inp.focus();
+        }
+
+        // Se já tiver resposta direta, exibe
+        if (d.resposta) {
+            addMsg(d.texto || '[áudio]', 'user');
+            addMsgTypewriter(d.resposta, 'assistant');
+            carregar();
+        }
+
+    } catch {
+        showToast('Erro ao transcrever áudio');
+    } finally {
+        document.getElementById('typing').classList.remove('visible');
+        document.getElementById('send-btn').disabled = false;
+    }
+}
 
 // ── Toast ──
 function showToast(msg) {
