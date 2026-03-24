@@ -37,7 +37,13 @@ app.config["SESSION_COOKIE_SAMESITE"]   = "Lax"
 app.config["MAX_CONTENT_LENGTH"]        = 10 * 1024 * 1024
 
 # ── Configurações ─────────────────────────────────────────────────────────────
-DATABASE_URL  = os.environ.get("DATABASE_URL", "")
+# CORREÇÃO DA URL: Ajusta prefixos para garantir compatibilidade com o SQLAlchemy/Psycopg2
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+elif DATABASE_URL.startswith("Postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("Postgresql://", "postgresql://", 1)
+
 GROQ_API_URL  = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL    = os.environ.get("GROQ_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
 HISTORY_LIMIT = int(os.environ.get("HISTORY_LIMIT", 20))
@@ -71,6 +77,7 @@ def is_rate_limited(key: str, max_calls: int = 30, window: int = 60) -> bool:
 # ── Banco de dados (PostgreSQL) ───────────────────────────────────────────────
 def get_db():
     if "db" not in g:
+        # Usa a DATABASE_URL já corrigida para evitar erros de driver
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
         g.db = conn
     return g.db
@@ -96,9 +103,14 @@ def db_commit():
     get_db().commit()
 
 def init_db():
+    if not DATABASE_URL:
+        log.error("DATABASE_URL não configurada!")
+        return
+    
     conn = psycopg2.connect(DATABASE_URL)
     conn.autocommit = True
     cur = conn.cursor()
+    # Cria as tabelas necessárias se o banco estiver vazio
     cur.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
             id            TEXT PRIMARY KEY,
@@ -136,8 +148,9 @@ def init_db():
     """)
     cur.close()
     conn.close()
-    log.info("PostgreSQL inicializado")
+    log.info("PostgreSQL inicializado e tabelas verificadas.")
 
+# Inicializa o banco no início do app
 try:
     init_db()
 except Exception as e:
