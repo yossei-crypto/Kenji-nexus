@@ -1,5 +1,4 @@
 import os
-import sqlite3
 import uuid
 import logging
 import hashlib
@@ -9,8 +8,11 @@ import base64
 from collections import defaultdict
 from datetime import timedelta, datetime
 from functools import wraps
+from contextlib import contextmanager
 
 import requests
+import psycopg2
+import psycopg2.extras
 from flask import Flask, render_template, request, jsonify, session, redirect, g
 
 # ── Logging ──────────────────────────────────────────────────────────────────
@@ -32,15 +34,15 @@ app.secret_key = secret_key
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=24)
 app.config["SESSION_COOKIE_HTTPONLY"]    = True
 app.config["SESSION_COOKIE_SAMESITE"]   = "Lax"
-app.config["MAX_CONTENT_LENGTH"]        = 10 * 1024 * 1024  # 10MB
+app.config["MAX_CONTENT_LENGTH"]        = 10 * 1024 * 1024
 
 # ── Configurações ─────────────────────────────────────────────────────────────
-DB_PATH       = os.environ.get("DB_PATH", "/tmp/kenji_memory.db")
+DATABASE_URL  = os.environ.get("DATABASE_URL", "")
 GROQ_API_URL  = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL    = os.environ.get("GROQ_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
 HISTORY_LIMIT = int(os.environ.get("HISTORY_LIMIT", 20))
 MAX_MSG_LEN   = int(os.environ.get("MAX_MSG_LEN", 4000))
-ACESSO_DIAS   = 60  # 2 meses
+ACESSO_DIAS   = 60
 VALOR_PIX     = "7,99"
 CHAVE_PIX     = os.environ.get("CHAVE_PIX", "82a91d75-2eba-4fcb-abc8-9be7c27764ac")
 ADMIN_WHATS   = os.environ.get("ADMIN_WHATS", "5585893665523")
@@ -56,7 +58,7 @@ SYSTEM_PROMPT = os.environ.get(
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 # ── Rate limiting ─────────────────────────────────────────────────────────────
-_rate_buckets: dict[str, list[float]] = defaultdict(list)
+_rate_buckets: dict = defaultdict(list)
 
 def is_rate_limited(key: str, max_calls: int = 30, window: int = 60) -> bool:
     now = time.time()
@@ -66,65 +68,80 @@ def is_rate_limited(key: str, max_calls: int = 30, window: int = 60) -> bool:
     _rate_buckets[key].append(now)
     return False
 
-# ── Banco de dados ────────────────────────────────────────────────────────────
-def get_db() -> sqlite3.Connection:
+# ── Banco de dados (PostgreSQL) ───────────────────────────────────────────────
+def get_db():
     if "db" not in g:
-        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA foreign_keys=ON")
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
         g.db = conn
     return g.db
 
 @app.teardown_appcontext
 def close_db(e=None):
     db = g.pop("db", None)
-    if db: db.close()
+    if db:
+        try: db.close()
+        except: pass
+
+def db_exec(sql, params=(), fetchone=False, fetchall=False):
+    db  = get_db()
+    cur = db.cursor()
+    cur.execute(sql, params)
+    if fetchone:
+        return cur.fetchone()
+    if fetchall:
+        return cur.fetchall()
+    return cur
+
+def db_commit():
+    get_db().commit()
 
 def init_db():
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS usuarios (
-                id            TEXT PRIMARY KEY,
-                email         TEXT UNIQUE NOT NULL,
-                senha_hash    TEXT NOT NULL,
-                nome          TEXT,
-                status        TEXT NOT NULL DEFAULT 'pendente',
-                acesso_ate    DATETIME,
-                criado_em     DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
+    conn = psycopg2.connect(DATABASE_URL)
+    conn.autocommit = True
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id            TEXT PRIMARY KEY,
+            email         TEXT UNIQUE NOT NULL,
+            senha_hash    TEXT NOT NULL,
+            nome          TEXT,
+            status        TEXT NOT NULL DEFAULT 'pendente',
+            acesso_ate    TIMESTAMP,
+            criado_em     TIMESTAMP DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS pagamentos (
+            id              TEXT PRIMARY KEY,
+            usuario_id      TEXT NOT NULL REFERENCES usuarios(id),
+            comprovante_b64 TEXT,
+            comprovante_ext TEXT,
+            status          TEXT NOT NULL DEFAULT 'aguardando',
+            criado_em       TIMESTAMP DEFAULT NOW(),
+            aprovado_em     TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS conversas (
+            id            TEXT PRIMARY KEY,
+            usuario_id    TEXT NOT NULL REFERENCES usuarios(id),
+            titulo        TEXT NOT NULL,
+            criado_em     TIMESTAMP DEFAULT NOW(),
+            atualizado_em TIMESTAMP DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS mensagens (
+            id          SERIAL PRIMARY KEY,
+            conversa_id TEXT NOT NULL REFERENCES conversas(id) ON DELETE CASCADE,
+            role        TEXT NOT NULL,
+            content     TEXT NOT NULL,
+            criado_em   TIMESTAMP DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_msgs ON mensagens(conversa_id, id);
+    """)
+    cur.close()
+    conn.close()
+    log.info("PostgreSQL inicializado")
 
-            CREATE TABLE IF NOT EXISTS pagamentos (
-                id              TEXT PRIMARY KEY,
-                usuario_id      TEXT NOT NULL REFERENCES usuarios(id),
-                comprovante_b64 TEXT,
-                comprovante_ext TEXT,
-                status          TEXT NOT NULL DEFAULT 'aguardando',
-                criado_em       DATETIME DEFAULT CURRENT_TIMESTAMP,
-                aprovado_em     DATETIME
-            );
-
-            CREATE TABLE IF NOT EXISTS conversas (
-                id            TEXT PRIMARY KEY,
-                usuario_id    TEXT NOT NULL REFERENCES usuarios(id),
-                titulo        TEXT NOT NULL,
-                criado_em     DATETIME DEFAULT CURRENT_TIMESTAMP,
-                atualizado_em DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS mensagens (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                conversa_id TEXT NOT NULL REFERENCES conversas(id) ON DELETE CASCADE,
-                role        TEXT NOT NULL CHECK(role IN ('user','assistant','system')),
-                content     TEXT NOT NULL,
-                criado_em   DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_msgs ON mensagens(conversa_id, id);
-        """)
-    log.info("DB inicializado em %s", DB_PATH)
-
-init_db()
+try:
+    init_db()
+except Exception as e:
+    log.error("Erro ao inicializar DB: %s", e)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def hash_senha(senha: str) -> str:
@@ -134,11 +151,13 @@ def check_senha(senha: str, stored: str) -> bool:
     return hmac.compare_digest(hash_senha(senha), stored)
 
 def usuario_ativo(u) -> bool:
-    if u["status"] != "ativo":
+    if not u or u["status"] != "ativo":
         return False
     if u["acesso_ate"]:
-        ate = datetime.fromisoformat(u["acesso_ate"])
-        if datetime.utcnow() > ate:
+        ate = u["acesso_ate"]
+        if isinstance(ate, str):
+            ate = datetime.fromisoformat(ate)
+        if datetime.utcnow() > ate.replace(tzinfo=None):
             return False
     return True
 
@@ -160,8 +179,7 @@ def acesso_required(f):
         uid = session.get("usuario_id")
         if not uid:
             return redirect("/login")
-        db = get_db()
-        u  = db.execute("SELECT * FROM usuarios WHERE id=?", (uid,)).fetchone()
+        u = db_exec("SELECT * FROM usuarios WHERE id=%s", (uid,), fetchone=True)
         if not u or not usuario_ativo(u):
             return redirect("/pagamento")
         return f(*args, **kwargs)
@@ -180,8 +198,7 @@ def admin_required(f):
 def index():
     if not session.get("usuario_id"):
         return redirect("/login")
-    db = get_db()
-    u  = db.execute("SELECT * FROM usuarios WHERE id=?", (session["usuario_id"],)).fetchone()
+    u = db_exec("SELECT * FROM usuarios WHERE id=%s", (session["usuario_id"],), fetchone=True)
     if not u:
         session.clear()
         return redirect("/login")
@@ -190,7 +207,7 @@ def index():
     return render_template("index.html")
 
 # ── Cadastro ──────────────────────────────────────────────────────────────────
-@app.route("/cadastro", methods=["GET","POST"])
+@app.route("/cadastro", methods=["GET", "POST"])
 def cadastro():
     if request.method == "GET":
         return render_template("cadastro.html")
@@ -206,35 +223,31 @@ def cadastro():
     if "@" not in email:
         return jsonify({"erro": "Email inválido."}), 400
 
-    db = get_db()
-    if db.execute("SELECT id FROM usuarios WHERE email=?", (email,)).fetchone():
+    if db_exec("SELECT id FROM usuarios WHERE email=%s", (email,), fetchone=True):
         return jsonify({"erro": "Email já cadastrado."}), 409
 
     uid = str(uuid.uuid4())
-    db.execute(
-        "INSERT INTO usuarios (id,email,senha_hash,nome,status) VALUES (?,?,?,?,?)",
-        (uid, email, hash_senha(senha), nome, "pendente")
-    )
-    db.commit()
-    session.permanent = True
+    db_exec("INSERT INTO usuarios (id,email,senha_hash,nome,status) VALUES (%s,%s,%s,%s,%s)",
+            (uid, email, hash_senha(senha), nome, "pendente"))
+    db_commit()
+    session.permanent     = True
     session["usuario_id"] = uid
     session["email"]      = email
     log.info("Novo usuário: %s", email)
     return jsonify({"ok": True, "redirect": "/pagamento"})
 
 # ── Login ─────────────────────────────────────────────────────────────────────
-@app.route("/login", methods=["GET","POST"])
+@app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
         return render_template("login_usuario.html")
-    ip   = request.remote_addr
+    ip = request.remote_addr
     if is_rate_limited(f"login:{ip}", max_calls=10, window=60):
         return jsonify({"erro": "Muitas tentativas."}), 429
     data  = request.get_json(silent=True) or {}
     email = (data.get("email") or "").strip().lower()
     senha = data.get("senha", "")
-    db    = get_db()
-    u     = db.execute("SELECT * FROM usuarios WHERE email=?", (email,)).fetchone()
+    u     = db_exec("SELECT * FROM usuarios WHERE email=%s", (email,), fetchone=True)
     if not u or not check_senha(senha, u["senha_hash"]):
         time.sleep(0.5)
         return jsonify({"erro": "Email ou senha incorretos."}), 401
@@ -254,34 +267,30 @@ def logout():
 @app.route("/pagamento")
 @login_required
 def pagamento():
-    db = get_db()
-    u  = db.execute("SELECT * FROM usuarios WHERE id=?", (session["usuario_id"],)).fetchone()
+    u = db_exec("SELECT * FROM usuarios WHERE id=%s", (session["usuario_id"],), fetchone=True)
     if u and usuario_ativo(u):
         return redirect("/")
-    # Verifica se já tem pagamento aguardando
-    pag = db.execute(
-        "SELECT * FROM pagamentos WHERE usuario_id=? AND status='aguardando' ORDER BY criado_em DESC LIMIT 1",
-        (session["usuario_id"],)
-    ).fetchone()
+    pag = db_exec(
+        "SELECT * FROM pagamentos WHERE usuario_id=%s AND status='aguardando' ORDER BY criado_em DESC LIMIT 1",
+        (session["usuario_id"],), fetchone=True
+    )
     return render_template("pagamento.html",
         chave_pix=CHAVE_PIX,
         valor=VALOR_PIX,
-        email=session.get("email",""),
+        email=session.get("email", ""),
         tem_pag_pendente=pag is not None
     )
 
 @app.route("/enviar_comprovante", methods=["POST"])
 @login_required
 def enviar_comprovante():
-    uid   = session["usuario_id"]
-    arq   = request.files.get("comprovante")
+    uid = session["usuario_id"]
+    arq = request.files.get("comprovante")
     if not arq:
         return jsonify({"erro": "Comprovante não enviado."}), 400
-
     mime = arq.content_type or "image/jpeg"
     if mime not in ALLOWED_IMAGE_TYPES:
-        return jsonify({"erro": "Arquivo inválido. Use imagem JPEG, PNG ou WebP."}), 400
-
+        return jsonify({"erro": "Use imagem JPEG, PNG ou WebP."}), 400
     try:
         img_data = arq.read()
         if len(img_data) > 8 * 1024 * 1024:
@@ -290,20 +299,16 @@ def enviar_comprovante():
     except Exception as e:
         log.error("Erro ao ler comprovante: %s", e)
         return jsonify({"erro": "Erro ao processar imagem."}), 500
+
     ext = mime.split("/")[-1]
-    db  = get_db()
     pid = str(uuid.uuid4())
-    db.execute(
-        "INSERT INTO pagamentos (id,usuario_id,comprovante_b64,comprovante_ext,status) VALUES (?,?,?,?,?)",
+    db_exec(
+        "INSERT INTO pagamentos (id,usuario_id,comprovante_b64,comprovante_ext,status) VALUES (%s,%s,%s,%s,%s)",
         (pid, uid, img_b64, ext, "aguardando")
     )
-    db.commit()
-
-    # Gera link WhatsApp para notificação
-    email = session.get("email","")
+    db_commit()
+    email = session.get("email", "")
     msg   = f"💰 Novo comprovante Kenji IA!\nUsuário: {email}\nAprovar: https://kenji-nexus.onrender.com/admin"
-    log.info("Comprovante enviado por %s — pagamento %s", email, pid)
-
     return jsonify({
         "ok": True,
         "whatsapp_url": f"https://wa.me/{ADMIN_WHATS}?text={requests.utils.quote(msg)}",
@@ -311,12 +316,12 @@ def enviar_comprovante():
     })
 
 # ── Admin ─────────────────────────────────────────────────────────────────────
-@app.route("/admin/login", methods=["GET","POST"])
+@app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
     if request.method == "GET":
         return render_template("admin_login.html")
     data  = request.get_json(silent=True) or {}
-    senha = data.get("senha","")
+    senha = data.get("senha", "")
     if hmac.compare_digest(senha, ADMIN_SENHA):
         session["admin"] = True
         return jsonify({"ok": True})
@@ -335,22 +340,20 @@ def admin():
 @app.route("/admin/pendentes")
 @admin_required
 def admin_pendentes():
-    db   = get_db()
-    rows = db.execute("""
+    rows = db_exec("""
         SELECT p.id, p.criado_em, p.comprovante_ext,
                u.email, u.nome, u.id as uid
         FROM pagamentos p
         JOIN usuarios u ON u.id = p.usuario_id
         WHERE p.status = 'aguardando'
         ORDER BY p.criado_em DESC
-    """).fetchall()
+    """, fetchall=True)
     return jsonify([dict(r) for r in rows])
 
 @app.route("/admin/comprovante/<pid>")
 @admin_required
 def admin_comprovante(pid):
-    db  = get_db()
-    pag = db.execute("SELECT comprovante_b64, comprovante_ext FROM pagamentos WHERE id=?", (pid,)).fetchone()
+    pag = db_exec("SELECT comprovante_b64,comprovante_ext FROM pagamentos WHERE id=%s", (pid,), fetchone=True)
     if not pag:
         return jsonify({"erro": "Não encontrado"}), 404
     return jsonify({"img": f"data:image/{pag['comprovante_ext']};base64,{pag['comprovante_b64']}"})
@@ -358,73 +361,70 @@ def admin_comprovante(pid):
 @app.route("/admin/aprovar/<pid>", methods=["POST"])
 @admin_required
 def admin_aprovar(pid):
-    db  = get_db()
-    pag = db.execute("SELECT * FROM pagamentos WHERE id=?", (pid,)).fetchone()
+    pag = db_exec("SELECT * FROM pagamentos WHERE id=%s", (pid,), fetchone=True)
     if not pag:
-        return jsonify({"erro": "Pagamento não encontrado"}), 404
-
-    agora     = datetime.utcnow()
+        return jsonify({"erro": "Não encontrado"}), 404
+    agora      = datetime.utcnow()
     acesso_ate = agora + timedelta(days=ACESSO_DIAS)
-
-    db.execute("UPDATE pagamentos SET status='aprovado', aprovado_em=? WHERE id=?",
-               (agora.isoformat(), pid))
-    db.execute("UPDATE usuarios SET status='ativo', acesso_ate=? WHERE id=?",
-               (acesso_ate.isoformat(), pag["usuario_id"]))
-    db.commit()
-    log.info("Pagamento %s aprovado — acesso até %s", pid, acesso_ate.date())
+    db_exec("UPDATE pagamentos SET status='aprovado', aprovado_em=%s WHERE id=%s", (agora, pid))
+    db_exec("UPDATE usuarios SET status='ativo', acesso_ate=%s WHERE id=%s", (acesso_ate, pag["usuario_id"]))
+    db_commit()
+    log.info("Pagamento %s aprovado", pid)
     return jsonify({"ok": True, "acesso_ate": acesso_ate.strftime("%d/%m/%Y")})
 
 @app.route("/admin/recusar/<pid>", methods=["POST"])
 @admin_required
 def admin_recusar(pid):
-    db = get_db()
-    if not db.execute("SELECT id FROM pagamentos WHERE id=?", (pid,)).fetchone():
+    if not db_exec("SELECT id FROM pagamentos WHERE id=%s", (pid,), fetchone=True):
         return jsonify({"erro": "Não encontrado"}), 404
-    db.execute("UPDATE pagamentos SET status='recusado' WHERE id=?", (pid,))
-    db.commit()
-    log.info("Pagamento %s recusado", pid)
+    db_exec("UPDATE pagamentos SET status='recusado' WHERE id=%s", (pid,))
+    db_commit()
     return jsonify({"ok": True})
 
 @app.route("/admin/liberar/<uid>", methods=["POST"])
 @admin_required
 def admin_liberar(uid):
-    db = get_db()
-    u  = db.execute("SELECT id FROM usuarios WHERE id=?", (uid,)).fetchone()
-    if not u:
-        return jsonify({"erro": "Usuario nao encontrado"}), 404
+    if not db_exec("SELECT id FROM usuarios WHERE id=%s", (uid,), fetchone=True):
+        return jsonify({"erro": "Usuário não encontrado"}), 404
     agora      = datetime.utcnow()
     acesso_ate = agora + timedelta(days=ACESSO_DIAS)
-    db.execute("UPDATE usuarios SET status='ativo', acesso_ate=? WHERE id=?",
-               (acesso_ate.isoformat(), uid))
-    db.commit()
+    db_exec("UPDATE usuarios SET status='ativo', acesso_ate=%s WHERE id=%s", (acesso_ate, uid))
+    db_commit()
     log.info("Acesso manual liberado para %s", uid)
     return jsonify({"ok": True, "acesso_ate": acesso_ate.strftime("%d/%m/%Y")})
 
 @app.route("/admin/usuarios")
 @admin_required
 def admin_usuarios():
-    db   = get_db()
-    rows = db.execute(
-        "SELECT id,email,nome,status,acesso_ate,criado_em FROM usuarios ORDER BY criado_em DESC"
-    ).fetchall()
-    return jsonify([dict(r) for r in rows])
+    rows = db_exec(
+        "SELECT id,email,nome,status,acesso_ate,criado_em FROM usuarios ORDER BY criado_em DESC",
+        fetchall=True
+    )
+    result = []
+    for r in rows:
+        d = dict(r)
+        if d.get("acesso_ate"):
+            d["acesso_ate"] = d["acesso_ate"].isoformat()
+        if d.get("criado_em"):
+            d["criado_em"] = d["criado_em"].isoformat()
+        result.append(d)
+    return jsonify(result)
 
-# ── Status do usuário ─────────────────────────────────────────────────────────
+# ── Status ────────────────────────────────────────────────────────────────────
 @app.route("/meu_status")
 @login_required
 def meu_status():
-    db = get_db()
-    u  = db.execute("SELECT * FROM usuarios WHERE id=?", (session["usuario_id"],)).fetchone()
+    u = db_exec("SELECT * FROM usuarios WHERE id=%s", (session["usuario_id"],), fetchone=True)
     if not u:
-        return jsonify({"erro": "Usuário não encontrado"}), 404
-    pag = db.execute(
-        "SELECT status,criado_em FROM pagamentos WHERE usuario_id=? ORDER BY criado_em DESC LIMIT 1",
-        (u["id"],)
-    ).fetchone()
+        return jsonify({"erro": "Não encontrado"}), 404
+    pag = db_exec(
+        "SELECT status,criado_em FROM pagamentos WHERE usuario_id=%s ORDER BY criado_em DESC LIMIT 1",
+        (u["id"],), fetchone=True
+    )
     return jsonify({
         "status":     u["status"],
         "ativo":      usuario_ativo(u),
-        "acesso_ate": u["acesso_ate"],
+        "acesso_ate": u["acesso_ate"].isoformat() if u["acesso_ate"] else None,
         "pagamento":  dict(pag) if pag else None,
     })
 
@@ -460,16 +460,13 @@ def chat():
     if not api_key:
         return jsonify({"error": "Serviço indisponível."}), 503
 
-    db = get_db()
-    # Verifica se conversa pertence ao usuário
-    conv = db.execute("SELECT id FROM conversas WHERE id=? AND usuario_id=?", (cid, uid)).fetchone()
-    if not conv:
+    if not db_exec("SELECT id FROM conversas WHERE id=%s AND usuario_id=%s", (cid, uid), fetchone=True):
         return jsonify({"error": "Conversa não encontrada."}), 404
 
-    rows = db.execute(
-        "SELECT role,content FROM mensagens WHERE conversa_id=? ORDER BY id DESC LIMIT ?",
-        (cid, HISTORY_LIMIT),
-    ).fetchall()
+    rows = db_exec(
+        "SELECT role,content FROM mensagens WHERE conversa_id=%s ORDER BY id DESC LIMIT %s",
+        (cid, HISTORY_LIMIT), fetchall=True
+    )
     history = [{"role": r["role"], "content": r["content"]} for r in reversed(rows)]
 
     titulo_novo = None
@@ -490,7 +487,7 @@ def chat():
 
     payload = {
         "model":       GROQ_MODEL,
-        "messages":    [{"role":"system","content":SYSTEM_PROMPT}, *history, {"role":"user","content":user_content}],
+        "messages":    [{"role": "system", "content": SYSTEM_PROMPT}, *history, {"role": "user", "content": user_content}],
         "max_tokens":  2048,
         "temperature": 0.7,
     }
@@ -508,18 +505,18 @@ def chat():
     except requests.HTTPError:
         return jsonify({"error": "Erro ao comunicar com o modelo."}), 502
     except (KeyError, IndexError, ValueError):
-        return jsonify({"error": "Resposta inválida do modelo."}), 502
+        return jsonify({"error": "Resposta inválida."}), 502
 
     msg_salva = msg if msg else "[imagem enviada]"
-    db.execute("INSERT INTO mensagens (conversa_id,role,content) VALUES (?,'user',?)", (cid, msg_salva))
-    db.execute("INSERT INTO mensagens (conversa_id,role,content) VALUES (?,'assistant',?)", (cid, resposta))
-    db.execute("UPDATE conversas SET atualizado_em=CURRENT_TIMESTAMP WHERE id=?", (cid,))
+    db_exec("INSERT INTO mensagens (conversa_id,role,content) VALUES (%s,'user',%s)", (cid, msg_salva))
+    db_exec("INSERT INTO mensagens (conversa_id,role,content) VALUES (%s,'assistant',%s)", (cid, resposta))
+    db_exec("UPDATE conversas SET atualizado_em=NOW() WHERE id=%s", (cid,))
     if titulo_novo:
-        db.execute("UPDATE conversas SET titulo=? WHERE id=?", (titulo_novo, cid))
-    db.commit()
+        db_exec("UPDATE conversas SET titulo=%s WHERE id=%s", (titulo_novo, cid))
+    db_commit()
     return jsonify({"resposta": resposta})
 
-# ── Transcrição áudio ─────────────────────────────────────────────────────────
+# ── Transcrição ───────────────────────────────────────────────────────────────
 @app.route("/transcrever", methods=["POST"])
 @acesso_required
 def transcrever():
@@ -555,41 +552,39 @@ def transcrever():
 def nova():
     uid = session["usuario_id"]
     nid = str(uuid.uuid4())
-    db  = get_db()
-    db.execute("INSERT INTO conversas (id,usuario_id,titulo) VALUES (?,?,?)", (nid, uid, "Nova missão"))
-    db.commit()
+    db_exec("INSERT INTO conversas (id,usuario_id,titulo) VALUES (%s,%s,%s)", (nid, uid, "Nova missão"))
+    db_commit()
     return jsonify({"id": nid}), 201
 
 @app.route("/carregar_conversas")
 @acesso_required
 def carregar():
     uid  = session["usuario_id"]
-    rows = get_db().execute(
-        "SELECT id,titulo FROM conversas WHERE usuario_id=? ORDER BY atualizado_em DESC LIMIT 50", (uid,)
-    ).fetchall()
+    rows = db_exec(
+        "SELECT id,titulo FROM conversas WHERE usuario_id=%s ORDER BY atualizado_em DESC LIMIT 50",
+        (uid,), fetchall=True
+    )
     return jsonify([dict(r) for r in rows])
 
 @app.route("/carregar_historico/<cid>")
 @acesso_required
 def historico(cid):
     uid = session["usuario_id"]
-    db  = get_db()
-    if not db.execute("SELECT id FROM conversas WHERE id=? AND usuario_id=?", (cid, uid)).fetchone():
+    if not db_exec("SELECT id FROM conversas WHERE id=%s AND usuario_id=%s", (cid, uid), fetchone=True):
         return jsonify({"error": "Não encontrada"}), 404
-    rows = db.execute(
-        "SELECT role,content FROM mensagens WHERE conversa_id=? ORDER BY id ASC", (cid,)
-    ).fetchall()
+    rows = db_exec(
+        "SELECT role,content FROM mensagens WHERE conversa_id=%s ORDER BY id ASC", (cid,), fetchall=True
+    )
     return jsonify([dict(r) for r in rows])
 
 @app.route("/deletar_conversa/<cid>", methods=["DELETE"])
 @acesso_required
 def deletar(cid):
     uid = session["usuario_id"]
-    db  = get_db()
-    if not db.execute("SELECT id FROM conversas WHERE id=? AND usuario_id=?", (cid, uid)).fetchone():
+    if not db_exec("SELECT id FROM conversas WHERE id=%s AND usuario_id=%s", (cid, uid), fetchone=True):
         return jsonify({"error": "Não encontrada"}), 404
-    db.execute("DELETE FROM conversas WHERE id=?", (cid,))
-    db.commit()
+    db_exec("DELETE FROM conversas WHERE id=%s", (cid,))
+    db_commit()
     return jsonify({"status": "ok"})
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -601,7 +596,7 @@ def health():
 def not_found(e): return jsonify({"error": "Não encontrado"}), 404
 
 @app.errorhandler(413)
-def too_large(e): return jsonify({"error": "Arquivo muito grande. Máx 10MB."}), 413
+def too_large(e): return jsonify({"error": "Arquivo muito grande."}), 413
 
 @app.errorhandler(500)
 def internal(e):
