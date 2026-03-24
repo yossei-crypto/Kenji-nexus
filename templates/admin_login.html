@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kenji IA — Admin Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+    <style>
+        :root { --green:#00ff88; --green-dim:rgba(0,255,136,0.12); --green-glow:rgba(0,255,136,0.3); --bg:#03030a; --surface:rgba(8,8,15,0.9); --border:rgba(0,255,136,0.13); --border-strong:rgba(0,255,136,0.4); --text:#c8c8d8; --text-dim:#44445a; --red:#ff3355; }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html,body { height:100%; font-family:'JetBrains Mono',monospace; background:var(--bg); color:var(--text); }
+        .stage { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
+        .card { width:100%; max-width:360px; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:36px 28px; backdrop-filter:blur(20px); box-shadow:0 24px 60px rgba(0,0,0,0.6); }
+        .logo { text-align:center; margin-bottom:28px; }
+        .logo h1 { font-family:'Syne',sans-serif; font-size:20px; font-weight:800; color:var(--red); letter-spacing:4px; }
+        .logo p { font-size:9px; color:var(--text-dim); letter-spacing:2px; margin-top:4px; }
+        .field { margin-bottom:16px; }
+        .field label { display:block; font-size:9px; letter-spacing:2px; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px; }
+        .field input { width:100%; background:rgba(3,3,10,0.8); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:12px 14px; color:#fff; font-family:'JetBrains Mono',monospace; font-size:13px; outline:none; transition:border-color 0.2s; }
+        .field input:focus { border-color:var(--border-strong); }
+        .btn { width:100%; padding:12px; background:var(--red); color:#fff; border:none; border-radius:10px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; margin-top:4px; }
+        .btn:hover { box-shadow:0 0 20px rgba(255,51,85,0.4); }
+        .err { font-size:11px; color:var(--red); text-align:center; margin-top:12px; min-height:16px; }
+    </style>
+</head>
+<body>
+<div class="stage">
+    <div class="card">
+        <div class="logo">
+            <h1>⚠ ADMIN</h1>
+            <p>ACESSO RESTRITO</p>
+        </div>
+        <div class="field">
+            <label>Senha Admin</label>
+            <input type="password" id="senha" placeholder="••••••••" autofocus>
+        </div>
+        <button class="btn" onclick="entrar()">Entrar</button>
+        <div class="err" id="err"></div>
+    </div>
+</div>
+<script>
+async function entrar(){
+    const senha=document.getElementById('senha').value;
+    const err=document.getElementById('err');
+    if(!senha){err.textContent='Digite a senha.';return;}
+    try{
+        const r=await fetch('/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({senha})});
+        const d=await r.json();
+        if(d.ok) window.location.href='/admin';
+        else err.textContent=d.erro||'Senha incorreta.';
+    }catch{err.textContent='Erro de conexão.';}
+}
+document.addEventListener('keydown',e=>{if(e.key==='Enter')entrar();});
+</script>
+</body>
+</html>
