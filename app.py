@@ -43,7 +43,7 @@ MAX_MSG_LEN   = int(os.environ.get("MAX_MSG_LEN", 4000))
 ACESSO_DIAS   = 60  # 2 meses
 VALOR_PIX     = "7,99"
 CHAVE_PIX     = os.environ.get("CHAVE_PIX", "82a91d75-2eba-4fcb-abc8-9be7c27764ac")
-ADMIN_WHATS   = os.environ.get("ADMIN_WHATS", "5585989365523")
+ADMIN_WHATS   = os.environ.get("ADMIN_WHATS", "5585893665523")
 ADMIN_SENHA   = os.environ.get("ADMIN_SENHA", os.environ.get("SENHA", "admin123"))
 
 SYSTEM_PROMPT = os.environ.get(
@@ -282,10 +282,15 @@ def enviar_comprovante():
     if mime not in ALLOWED_IMAGE_TYPES:
         return jsonify({"erro": "Arquivo inválido. Use imagem JPEG, PNG ou WebP."}), 400
 
-    # Salva como base64 no banco
-    img_b64 = base64.b64encode(arq.read()).decode("utf-8")
-    ext     = mime.split("/")[-1]
-
+    try:
+        img_data = arq.read()
+        if len(img_data) > 8 * 1024 * 1024:
+            return jsonify({"erro": "Imagem muito grande. Use menos de 8MB."}), 400
+        img_b64 = base64.b64encode(img_data).decode("utf-8")
+    except Exception as e:
+        log.error("Erro ao ler comprovante: %s", e)
+        return jsonify({"erro": "Erro ao processar imagem."}), 500
+    ext = mime.split("/")[-1]
     db  = get_db()
     pid = str(uuid.uuid4())
     db.execute(
@@ -379,6 +384,21 @@ def admin_recusar(pid):
     db.commit()
     log.info("Pagamento %s recusado", pid)
     return jsonify({"ok": True})
+
+@app.route("/admin/liberar/<uid>", methods=["POST"])
+@admin_required
+def admin_liberar(uid):
+    db = get_db()
+    u  = db.execute("SELECT id FROM usuarios WHERE id=?", (uid,)).fetchone()
+    if not u:
+        return jsonify({"erro": "Usuario nao encontrado"}), 404
+    agora      = datetime.utcnow()
+    acesso_ate = agora + timedelta(days=ACESSO_DIAS)
+    db.execute("UPDATE usuarios SET status='ativo', acesso_ate=? WHERE id=?",
+               (acesso_ate.isoformat(), uid))
+    db.commit()
+    log.info("Acesso manual liberado para %s", uid)
+    return jsonify({"ok": True, "acesso_ate": acesso_ate.strftime("%d/%m/%Y")})
 
 @app.route("/admin/usuarios")
 @admin_required
