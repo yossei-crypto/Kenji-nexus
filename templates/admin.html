@@ -88,7 +88,7 @@
         <h2>Usuários Cadastrados</h2>
         <div class="table-wrap">
             <table>
-                <thead><tr><th>Email</th><th>Nome</th><th>Status</th><th>Acesso até</th><th>Cadastro</th></tr></thead>
+                <thead><tr><th>Email</th><th>Nome</th><th>Status</th><th>Acesso até</th><th>Ação</th></tr></thead>
                 <tbody id="usuarios-body"><tr><td colspan="5" style="text-align:center;color:var(--text-dim)">Carregando...</td></tr></tbody>
             </table>
         </div>
@@ -218,15 +218,33 @@ async function loadUsuarios() {
         body.innerHTML = d.map(u => {
             const cls = u.status==='ativo'?'status-ativo':u.status==='pendente'?'status-pendente':'status-inativo';
             const ate = u.acesso_ate ? new Date(u.acesso_ate).toLocaleDateString('pt-BR') : '—';
+            const btnLiberar = u.status !== 'ativo'
+                ? `<button class="btn-aprovar" onclick="liberarUsuario('${u.id}',this)" style="padding:5px 12px;font-size:9px">▶ Liberar</button>`
+                : `<span style="color:var(--text-dim);font-size:10px">Ativo</span>`;
             return `<tr>
                 <td>${u.email}</td>
                 <td>${u.nome||'—'}</td>
                 <td class="${cls}">${u.status.toUpperCase()}</td>
                 <td>${ate}</td>
-                <td>${new Date(u.criado_em).toLocaleDateString('pt-BR')}</td>
+                <td>${btnLiberar}</td>
             </tr>`;
         }).join('');
     } catch { document.getElementById('usuarios-body').innerHTML='<tr><td colspan="5">Erro ao carregar</td></tr>'; }
+}
+
+// ── Liberar acesso manual ──
+async function liberarUsuario(uid, btn) {
+    if(!confirm('Liberar acesso por 60 dias para este usuário?')) return;
+    if(btn) { btn.disabled=true; btn.textContent='...'; }
+    try {
+        const r = await fetch(`/admin/liberar/${uid}`,{method:'POST'});
+        const d = await r.json();
+        if(d.ok) {
+            toast(`✅ Acesso liberado até ${d.acesso_ate}`);
+            loadUsuarios();
+        } else { toast(d.erro||'Erro','err'); }
+    } catch { toast('Erro de conexão','err'); }
+    if(btn) { btn.disabled=false; btn.textContent='▶ Liberar'; }
 }
 
 // ── Toast ──
