@@ -43,7 +43,7 @@ MAX_MSG_LEN   = int(os.environ.get("MAX_MSG_LEN", 4000))
 ACESSO_DIAS   = 60  # 2 meses
 VALOR_PIX     = "7,99"
 CHAVE_PIX     = os.environ.get("CHAVE_PIX", "82a91d75-2eba-4fcb-abc8-9be7c27764ac")
-ADMIN_WHATS   = os.environ.get("ADMIN_WHATS", "5585893665523")
+ADMIN_WHATS   = os.environ.get("ADMIN_WHATS", "5585989365523")
 ADMIN_SENHA   = os.environ.get("ADMIN_SENHA", os.environ.get("SENHA", "admin123"))
 
 SYSTEM_PROMPT = os.environ.get(
