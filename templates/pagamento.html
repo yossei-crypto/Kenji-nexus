@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kenji IA — Pagamento</title>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
-    <!-- QR Code library -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <style>
         :root { --green:#00ff88; --green-dim:rgba(0,255,136,0.12); --green-glow:rgba(0,255,136,0.3); --bg:#03030a; --surface:rgba(8,8,15,0.9); --border:rgba(0,255,136,0.13); --border-strong:rgba(0,255,136,0.4); --text:#c8c8d8; --text-dim:#44445a; --red:#ff3355; --yellow:#ffcc00; }
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -27,9 +25,6 @@
         .step-num { flex-shrink:0; width:24px; height:24px; border-radius:50%; background:var(--green); color:#000; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; }
         .step-txt { font-size:12px; color:var(--text); line-height:1.5; }
         .step-txt span { color:var(--green); }
-        /* QR Code */
-        .qr-wrap { text-align:center; margin:20px 0; }
-        .qr-wrap canvas { border-radius:12px; border:3px solid var(--green); padding:8px; background:#fff; }
         .chave-box { background:rgba(0,0,0,0.4); border:1px solid var(--border); border-radius:8px; padding:10px 14px; font-size:11px; color:var(--green); word-break:break-all; margin:10px 0; display:flex; align-items:center; justify-content:space-between; gap:8px; }
         .copy-btn { background:none; border:1px solid var(--border); color:var(--text-dim); padding:4px 10px; font-size:10px; font-family:'JetBrains Mono',monospace; border-radius:6px; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
         .copy-btn:hover,.copy-btn.ok { color:var(--green); border-color:var(--green); }
@@ -83,13 +78,9 @@
         </div>
 
         <div class="steps">
-            <div class="step"><div class="step-num">1</div><div class="step-txt">Escaneie o QR Code ou copie a chave Pix abaixo</div></div>
+            <div class="step"><div class="step-num">1</div><div class="step-txt">Copie a chave Pix abaixo</div></div>
             <div class="step"><div class="step-num">2</div><div class="step-txt">Pague <span>R$ {{ valor }}</span> via Pix</div></div>
             <div class="step"><div class="step-num">3</div><div class="step-txt">Envie o comprovante aqui e aguarde a aprovação</div></div>
-        </div>
-
-        <div class="qr-wrap">
-            <canvas id="qr-canvas"></canvas>
         </div>
 
         <div class="chave-box">
@@ -128,14 +119,8 @@ const pts=Array.from({length:40},()=>({x:Math.random()*c.width,y:Math.random()*c
 function draw(){x.clearRect(0,0,c.width,c.height);pts.forEach(p=>{p.p+=.02;p.x+=p.vx;p.y+=p.vy;if(p.x<-10)p.x=c.width+10;if(p.x>c.width+10)p.x=-10;if(p.y<-10)p.y=c.height+10;if(p.y>c.height+10)p.y=-10;x.globalAlpha=p.a*(0.7+0.3*Math.sin(p.p));x.beginPath();x.arc(p.x,p.y,p.r,0,6.28);x.fillStyle=p.col;x.shadowBlur=6;x.shadowColor=p.col;x.fill();x.globalAlpha=1;x.shadowBlur=0;});requestAnimationFrame(draw);}
 draw();
 
-// QR Code
+// Captura a chave Pix (necessária para o botão de copiar)
 const chave = document.getElementById('chave-txt')?.textContent?.trim();
-if(chave && typeof QRCode !== 'undefined') {
-    QRCode.toCanvas(document.getElementById('qr-canvas'), chave, {
-        width: 200, margin: 1,
-        color: { dark: '#000000', light: '#ffffff' }
-    });
-}
 
 // Copiar chave
 function copiarChave(){
