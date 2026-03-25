@@ -695,7 +695,8 @@ async function env() {
         isLoading = false;
         document.getElementById('send-btn').disabled = false;
         removeImage();
-        inp.focus();
+        // Só foca se não for mobile (evita teclado abrindo sozinho)
+        if (window.innerWidth > 768) inp.focus();
     }
 }
 
