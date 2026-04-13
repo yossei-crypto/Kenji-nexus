@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kenji IA | Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --green: #00ff88; --green-dim: rgba(0,255,136,0.12); --green-glow: rgba(0,255,136,0.35);
+            --bg: #03030a; --bg2: rgba(7,7,15,0.95); --border: rgba(0,255,136,0.18); --border-strong: rgba(0,255,136,0.45);
+            --text: #c8c8d8; --text-dim: #55556a; --red: #ff4466; --cyan: #00ccff; --yellow: #ffcc00;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { min-height: 100dvh; background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', monospace; }
+        header { padding: 0 20px; height: 56px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; background: var(--bg2); backdrop-filter: blur(16px); position: sticky; top: 0; z-index: 100; }
+        .header-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px; color: var(--green); letter-spacing: 5px; flex: 1; text-shadow: 0 0 16px rgba(0,255,136,0.4); }
+        .logout-btn { color: var(--text-dim); text-decoration: none; font-size: 10px; letter-spacing: 1px; padding: 6px 10px; border: 1px solid transparent; border-radius: 4px; transition: all 0.2s; }
+        .logout-btn:hover { color: var(--red); border-color: rgba(255,68,102,0.3); }
+        .container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+        .section-title { font-size: 10px; color: var(--text-dim); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+        .tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+        .tab { padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; font-size: 11px; color: var(--text-dim); cursor: pointer; letter-spacing: 1px; transition: all 0.2s; background: none; font-family: 'JetBrains Mono', monospace; }
+        .tab.active { color: var(--green); border-color: var(--border-strong); background: var(--green-dim); }
+        .card { background: rgba(0,255,136,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .card-email { font-size: 13px; color: var(--text); }
+        .card-date { font-size: 10px; color: var(--text-dim); }
+        .card-nome { font-size: 10px; color: var(--text-dim); margin-bottom: 12px; }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-aprovar { padding: 8px 14px; background: var(--green-dim); border: 1px solid var(--border-strong); color: var(--green); font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 1px; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+        .btn-aprovar:hover { background: rgba(0,255,136,0.2); box-shadow: 0 0 12px var(--green-glow); }
+        .btn-recusar { padding: 8px 14px; background: rgba(255,68,102,0.08); border: 1px solid rgba(255,68,102,0.3); color: var(--red); font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1px; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+        .btn-recusar:hover { background: rgba(255,68,102,0.15); }
+        .btn-ver { padding: 8px 14px; background: rgba(0,204,255,0.08); border: 1px solid rgba(0,204,255,0.3); color: var(--cyan); font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1px; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+        .btn-ver:hover { background: rgba(0,204,255,0.15); }
+        .btn-liberar { padding: 8px 14px; background: rgba(255,204,0,0.08); border: 1px solid rgba(255,204,0,0.3); color: var(--yellow); font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1px; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+        .btn-liberar:hover { background: rgba(255,204,0,0.15); }
+        .empty { text-align: center; padding: 40px 20px; font-size: 11px; color: var(--text-dim); letter-spacing: 1px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; letter-spacing: 1px; font-weight: 700; }
+        .badge-ativo { background: var(--green-dim); color: var(--green); border: 1px solid var(--border-strong); }
+        .badge-pendente { background: rgba(255,204,0,0.1); color: var(--yellow); border: 1px solid rgba(255,204,0,0.3); }
+        .badge-inativo { background: rgba(255,68,102,0.1); color: var(--red); border: 1px solid rgba(255,68,102,0.3); }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 999; align-items: center; justify-content: center; padding: 20px; }
+        .modal.open { display: flex; }
+        .modal-box { background: #0a0a14; border: 1px solid var(--border-strong); border-radius: 12px; padding: 20px; max-width: 380px; width: 100%; }
+        .modal-img { width: 100%; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 12px; }
+        .modal-close { width: 100%; padding: 10px; background: none; border: 1px solid var(--border); color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 11px; border-radius: 6px; cursor: pointer; }
+        .loading { text-align: center; padding: 40px; font-size: 11px; color: var(--text-dim); animation: blink 1s infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        #pane-usuarios { display: none; }
+        .user-status { font-size: 10px; color: var(--text-dim); }
+        .acesso-ate { font-size: 10px; color: var(--cyan); margin-top: 4px; }
+    </style>
+</head>
+<body>
+<header>
+    <div class="header-title">KENJI // ADMIN</div>
+    <a class="logout-btn" href="/admin/logout">SAIR</a>
+</header>
+
+<div class="container">
+    <div class="tabs">
+        <button class="tab active" onclick="showTab('pendentes')">PENDENTES</button>
+        <button class="tab" onclick="showTab('usuarios')">USUÁRIOS</button>
+    </div>
+
+    <!-- PENDENTES -->
+    <div id="pane-pendentes">
+        <div class="section-title">> Comprovantes aguardando aprovação</div>
+        <div id="lista-pendentes"><div class="loading">carregando...</div></div>
+    </div>
+
+    <!-- USUÁRIOS -->
+    <div id="pane-usuarios">
+        <div class="section-title">> Todos os usuários</div>
+        <div id="lista-usuarios"><div class="loading">carregando...</div></div>
+    </div>
+</div>
+
+<!-- Modal comprovante -->
+<div class="modal" id="modal" onclick="fecharModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <img class="modal-img" id="modal-img" src="" alt="Comprovante">
+        <button class="modal-close" onclick="fecharModal()">FECHAR</button>
+    </div>
+</div>
+
+<script>
+function showTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('pane-pendentes').style.display = tab === 'pendentes' ? 'block' : 'none';
+    document.getElementById('pane-usuarios').style.display  = tab === 'usuarios'  ? 'block' : 'none';
+    if (tab === 'usuarios') carregarUsuarios();
+}
+
+async function carregarPendentes() {
+    try {
+        const r = await fetch('/admin/pendentes');
+        const lista = await r.json();
+        const el = document.getElementById('lista-pendentes');
+        if (!lista.length) { el.innerHTML = '<div class="empty">> Nenhum comprovante pendente</div>'; return; }
+        el.innerHTML = lista.map(p => `
+            <div class="card" id="card-${p.id}">
+                <div class="card-header">
+                    <div class="card-email">${p.email}</div>
+                    <div class="card-date">${new Date(p.criado_em).toLocaleString('pt-BR')}</div>
+                </div>
+                <div class="card-nome">${p.nome || 'Sem nome'}</div>
+                <div class="actions">
+                    <button class="btn-ver" onclick="verComprovante('${p.id}')">VER</button>
+                    <button class="btn-aprovar" onclick="aprovar('${p.id}', '${p.uid}')">APROVAR</button>
+                    <button class="btn-recusar" onclick="recusar('${p.id}')">RECUSAR</button>
+                </div>
+            </div>
+        `).join('');
+    } catch { document.getElementById('lista-pendentes').innerHTML = '<div class="empty">> Erro ao carregar</div>'; }
+}
+
+async function carregarUsuarios() {
+    try {
+        const r = await fetch('/admin/usuarios');
+        const lista = await r.json();
+        const el = document.getElementById('lista-usuarios');
+        if (!lista.length) { el.innerHTML = '<div class="empty">> Nenhum usuário</div>'; return; }
+        el.innerHTML = lista.map(u => {
+            const badge = u.status === 'ativo' ? 'badge-ativo' : u.status === 'pendente' ? 'badge-pendente' : 'badge-inativo';
+            const acesso = u.acesso_ate ? `<div class="acesso-ate">Acesso até: ${new Date(u.acesso_ate).toLocaleDateString('pt-BR')}</div>` : '';
+            return `
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-email">${u.email}</div>
+                    <span class="badge ${badge}">${u.status.toUpperCase()}</span>
+                </div>
+                <div class="card-nome">${u.nome || 'Sem nome'}</div>
+                ${acesso}
+                <div class="actions" style="margin-top:10px">
+                    <button class="btn-liberar" onclick="liberar('${u.id}', this)">LIBERAR 60 DIAS</button>
+                </div>
+            </div>`;
+        }).join('');
+    } catch { document.getElementById('lista-usuarios').innerHTML = '<div class="empty">> Erro ao carregar</div>'; }
+}
+
+async function verComprovante(pid) {
+    const r = await fetch(`/admin/comprovante/${pid}`);
+    const d = await r.json();
+    document.getElementById('modal-img').src = d.img;
+    document.getElementById('modal').classList.add('open');
+}
+
+function fecharModal() { document.getElementById('modal').classList.remove('open'); }
+
+async function aprovar(pid, uid) {
+    if (!confirm('Aprovar este pagamento?')) return;
+    const r = await fetch(`/admin/aprovar/${pid}`, { method:'POST' });
+    const d = await r.json();
+    if (d.ok) { document.getElementById(`card-${pid}`)?.remove(); alert(`✅ Aprovado! Acesso até ${d.acesso_ate}`); }
+    else alert('Erro: ' + (d.erro || 'desconhecido'));
+}
+
+async function recusar(pid) {
+    if (!confirm('Recusar este comprovante?')) return;
+    const r = await fetch(`/admin/recusar/${pid}`, { method:'POST' });
+    const d = await r.json();
+    if (d.ok) { document.getElementById(`card-${pid}`)?.remove(); }
+    else alert('Erro: ' + (d.erro || 'desconhecido'));
+}
+
+async function liberar(uid, btn) {
+    if (!confirm('Liberar 60 dias de acesso?')) return;
+    btn.disabled = true;
+    const r = await fetch(`/admin/liberar/${uid}`, { method:'POST' });
+    const d = await r.json();
+    if (d.ok) { alert(`✅ Acesso liberado até ${d.acesso_ate}`); carregarUsuarios(); }
+    else { alert('Erro: ' + (d.erro || 'desconhecido')); btn.disabled = false; }
+}
+
+carregarPendentes();
+</script>
+</body>
+</html>
