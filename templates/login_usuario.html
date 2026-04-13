@@ -9,8 +9,8 @@
     <style>
         :root {
             --green: #00ff88; --green-dim: rgba(0,255,136,0.12); --green-glow: rgba(0,255,136,0.35);
-            --bg: #03030a; --bg2: rgba(7,7,15,0.92); --border: rgba(0,255,136,0.18);
-            --border-strong: rgba(0,255,136,0.45); --text: #c8c8d8; --text-dim: #55556a; --red: #ff4466;
+            --bg: #03030a; --border: rgba(0,255,136,0.18); --border-strong: rgba(0,255,136,0.45);
+            --text: #c8c8d8; --text-dim: #55556a; --red: #ff4466;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100dvh; background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; justify-content: center; }
@@ -27,13 +27,12 @@
         input { width: 100%; background: rgba(0,255,136,0.04); border: 1px solid var(--border); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 12px 14px; border-radius: 6px; outline: none; transition: border-color 0.2s; }
         input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(0,255,136,0.1); }
         input::placeholder { color: var(--text-dim); }
-        .btn { width: 100%; padding: 14px; background: var(--green-dim); border: 1px solid var(--border-strong); color: var(--green); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; border-radius: 6px; cursor: pointer; transition: all 0.2s; margin-top: 8px; }
-        .btn:hover { background: rgba(0,255,136,0.2); box-shadow: 0 0 20px var(--green-glow); }
+        .btn { width: 100%; padding: 16px; background: var(--green-dim); border: 1px solid var(--border-strong); color: var(--green); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; border-radius: 6px; cursor: pointer; transition: all 0.2s; margin-top: 8px; touch-action: manipulation; -webkit-tap-highlight-color: rgba(0,255,136,0.2); user-select: none; }
+        .btn:active { background: rgba(0,255,136,0.25); transform: scale(0.98); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .err { color: var(--red); font-size: 11px; text-align: center; margin-top: 12px; min-height: 16px; letter-spacing: 0.5px; }
         .link { text-align: center; margin-top: 20px; font-size: 11px; color: var(--text-dim); }
         .link a { color: var(--green); text-decoration: none; }
-        .link a:hover { text-shadow: 0 0 8px var(--green); }
         .prompt { font-size: 10px; color: var(--text-dim); text-align: center; margin-bottom: 24px; letter-spacing: 1px; }
         .prompt span { color: var(--green); }
     </style>
@@ -51,18 +50,19 @@
 
     <div class="field">
         <label>Email</label>
-        <input type="email" id="email" placeholder="usuario@email.com" autocomplete="email">
+        <input type="email" id="email" placeholder="usuario@email.com" autocomplete="email" inputmode="email">
     </div>
     <div class="field">
         <label>Senha</label>
         <input type="password" id="senha" placeholder="••••••••" autocomplete="current-password">
     </div>
-    <button class="btn" id="btn" onclick="entrar()">[ ACESSAR SISTEMA ]</button>
+    <button class="btn" id="btn" type="button">[ ACESSAR SISTEMA ]</button>
     <div class="err" id="err"></div>
     <div class="link">Não tem conta? <a href="/cadastro">Criar acesso</a></div>
 </div>
 
 <script>
+// Canvas background
 const canvas = document.getElementById('bg-canvas');
 const ctx = canvas.getContext('2d');
 let W, H, particles = [];
@@ -72,25 +72,49 @@ function draw() { ctx.clearRect(0,0,W,H); particles.forEach(p=>{ p.x+=p.vx; p.y+
 resize(); initParticles(); draw();
 window.addEventListener('resize', ()=>{ resize(); initParticles(); });
 
-document.getElementById('senha').addEventListener('keydown', e => { if(e.key==='Enter') entrar(); });
+let enviando = false;
 
 async function entrar() {
+    if (enviando) return;
     const email = document.getElementById('email').value.trim();
     const senha = document.getElementById('senha').value;
     const err   = document.getElementById('err');
     const btn   = document.getElementById('btn');
     if (!email || !senha) { err.textContent = '> Email e senha obrigatórios'; return; }
+    enviando = true;
     btn.disabled = true;
     btn.textContent = '[ VERIFICANDO... ]';
     err.textContent = '';
     try {
-        const r = await fetch('/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email, senha}) });
+        const r = await fetch('/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, senha: senha })
+        });
         const d = await r.json();
-        if (d.erro) { err.textContent = '> ' + d.erro; }
-        else if (d.redirect) { window.location.href = d.redirect; }
-    } catch { err.textContent = '> Erro de conexão. Tente novamente.'; }
-    finally { btn.disabled = false; btn.textContent = '[ ACESSAR SISTEMA ]'; }
+        if (d.erro) {
+            err.textContent = '> ' + d.erro;
+        } else if (d.redirect) {
+            window.location.href = d.redirect;
+        } else {
+            err.textContent = '> Resposta inválida do servidor';
+        }
+    } catch(e) {
+        err.textContent = '> Erro de conexão: ' + e.message;
+    } finally {
+        enviando = false;
+        btn.disabled = false;
+        btn.textContent = '[ ACESSAR SISTEMA ]';
+    }
 }
+
+document.getElementById('btn').addEventListener('click', entrar);
+document.getElementById('senha').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); entrar(); }
+});
+document.getElementById('email').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('senha').focus(); }
+});
 </script>
 </body>
 </html>
