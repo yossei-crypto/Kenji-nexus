@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kenji IA | Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --green: #00ff88; --green-dim: rgba(0,255,136,0.12); --green-glow: rgba(0,255,136,0.35);
+            --bg: #03030a; --bg2: rgba(7,7,15,0.92); --border: rgba(0,255,136,0.18);
+            --border-strong: rgba(0,255,136,0.45); --text: #c8c8d8; --text-dim: #55556a; --red: #ff4466;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100dvh; background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; justify-content: center; }
+        #bg-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+        .vignette { position: fixed; inset: 0; background: radial-gradient(ellipse 80% 80% at 50% 50%, transparent 20%, rgba(3,3,10,0.7) 100%); z-index: 1; pointer-events: none; }
+        .noise { position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E"); pointer-events: none; z-index: 2; opacity: 0.4; }
+        .scanline { position: fixed; left: 0; right: 0; height: 120px; background: linear-gradient(transparent, rgba(0,255,136,0.025), transparent); animation: scan 9s linear infinite; z-index: 3; pointer-events: none; }
+        @keyframes scan { from { top: -120px; } to { top: 100vh; } }
+        .card { position: relative; z-index: 10; width: 100%; max-width: 400px; padding: 20px; }
+        .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 32px; color: var(--green); letter-spacing: 8px; text-align: center; text-shadow: 0 0 30px rgba(0,255,136,0.4); margin-bottom: 6px; }
+        .sub { font-size: 10px; color: var(--text-dim); letter-spacing: 3px; text-align: center; margin-bottom: 36px; }
+        .field { margin-bottom: 16px; }
+        label { display: block; font-size: 10px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 6px; text-transform: uppercase; }
+        input { width: 100%; background: rgba(0,255,136,0.04); border: 1px solid var(--border); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 12px 14px; border-radius: 6px; outline: none; transition: border-color 0.2s; }
+        input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(0,255,136,0.1); }
+        input::placeholder { color: var(--text-dim); }
+        .btn { width: 100%; padding: 14px; background: var(--green-dim); border: 1px solid var(--border-strong); color: var(--green); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; border-radius: 6px; cursor: pointer; transition: all 0.2s; margin-top: 8px; }
+        .btn:hover { background: rgba(0,255,136,0.2); box-shadow: 0 0 20px var(--green-glow); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .err { color: var(--red); font-size: 11px; text-align: center; margin-top: 12px; min-height: 16px; letter-spacing: 0.5px; }
+        .link { text-align: center; margin-top: 20px; font-size: 11px; color: var(--text-dim); }
+        .link a { color: var(--green); text-decoration: none; }
+        .link a:hover { text-shadow: 0 0 8px var(--green); }
+        .prompt { font-size: 10px; color: var(--text-dim); text-align: center; margin-bottom: 24px; letter-spacing: 1px; }
+        .prompt span { color: var(--green); }
+    </style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div class="vignette"></div>
+<div class="noise"></div>
+<div class="scanline"></div>
+
+<div class="card">
+    <div class="logo">KENJI</div>
+    <div class="sub">SISTEMA DE IA // ACESSO RESTRITO</div>
+    <div class="prompt"><span>></span> Identificação necessária para continuar</div>
+
+    <div class="field">
+        <label>Email</label>
+        <input type="email" id="email" placeholder="usuario@email.com" autocomplete="email">
+    </div>
+    <div class="field">
+        <label>Senha</label>
+        <input type="password" id="senha" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn" id="btn" onclick="entrar()">[ ACESSAR SISTEMA ]</button>
+    <div class="err" id="err"></div>
+    <div class="link">Não tem conta? <a href="/cadastro">Criar acesso</a></div>
+</div>
+
+<script>
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let W, H, particles = [];
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+function initParticles() { particles = []; for(let i=0;i<60;i++) particles.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-0.5)*0.3,vy:(Math.random()-0.5)*0.3,size:Math.random()*1.5+0.5,alpha:Math.random()*0.4+0.1}); }
+function draw() { ctx.clearRect(0,0,W,H); particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; if(p.x<0)p.x=W; if(p.x>W)p.x=0; if(p.y<0)p.y=H; if(p.y>H)p.y=0; ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fillStyle=`rgba(0,255,136,${p.alpha})`; ctx.fill(); }); requestAnimationFrame(draw); }
+resize(); initParticles(); draw();
+window.addEventListener('resize', ()=>{ resize(); initParticles(); });
+
+document.getElementById('senha').addEventListener('keydown', e => { if(e.key==='Enter') entrar(); });
+
+async function entrar() {
+    const email = document.getElementById('email').value.trim();
+    const senha = document.getElementById('senha').value;
+    const err   = document.getElementById('err');
+    const btn   = document.getElementById('btn');
+    if (!email || !senha) { err.textContent = '> Email e senha obrigatórios'; return; }
+    btn.disabled = true;
+    btn.textContent = '[ VERIFICANDO... ]';
+    err.textContent = '';
+    try {
+        const r = await fetch('/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email, senha}) });
+        const d = await r.json();
+        if (d.erro) { err.textContent = '> ' + d.erro; }
+        else if (d.redirect) { window.location.href = d.redirect; }
+    } catch { err.textContent = '> Erro de conexão. Tente novamente.'; }
+    finally { btn.disabled = false; btn.textContent = '[ ACESSAR SISTEMA ]'; }
+}
+</script>
+</body>
+</html>
