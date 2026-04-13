@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kenji IA | Pagamento</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --green: #00ff88; --green-dim: rgba(0,255,136,0.12); --green-glow: rgba(0,255,136,0.35);
+            --bg: #03030a; --border: rgba(0,255,136,0.18); --border-strong: rgba(0,255,136,0.45);
+            --text: #c8c8d8; --text-dim: #55556a; --red: #ff4466; --cyan: #00ccff;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { min-height: 100dvh; background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        #bg-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+        .vignette { position: fixed; inset: 0; background: radial-gradient(ellipse 80% 80% at 50% 50%, transparent 20%, rgba(3,3,10,0.7) 100%); z-index: 1; pointer-events: none; }
+        .noise { position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E"); pointer-events: none; z-index: 2; opacity: 0.4; }
+        .scanline { position: fixed; left: 0; right: 0; height: 120px; background: linear-gradient(transparent, rgba(0,255,136,0.025), transparent); animation: scan 9s linear infinite; z-index: 3; pointer-events: none; }
+        @keyframes scan { from { top: -120px; } to { top: 100vh; } }
+        .card { position: relative; z-index: 10; width: 100%; max-width: 440px; }
+        .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 28px; color: var(--green); letter-spacing: 8px; text-align: center; text-shadow: 0 0 30px rgba(0,255,136,0.4); margin-bottom: 6px; }
+        .sub { font-size: 10px; color: var(--text-dim); letter-spacing: 3px; text-align: center; margin-bottom: 28px; }
+        .pix-box { background: rgba(0,255,136,0.04); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .pix-title { font-size: 10px; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; }
+        .pix-valor { font-family: 'Syne', sans-serif; font-size: 36px; font-weight: 800; color: var(--green); text-shadow: 0 0 20px rgba(0,255,136,0.4); margin-bottom: 4px; }
+        .pix-periodo { font-size: 10px; color: var(--text-dim); margin-bottom: 16px; }
+        .pix-chave-label { font-size: 10px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 6px; }
+        .pix-chave { background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; font-size: 11px; color: var(--green); word-break: break-all; cursor: pointer; transition: border-color 0.2s; }
+        .pix-chave:hover { border-color: var(--green); }
+        .copy-hint { font-size: 9px; color: var(--text-dim); margin-top: 6px; letter-spacing: 1px; }
+        .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+        .upload-label { display: block; font-size: 10px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 10px; text-transform: uppercase; }
+        .upload-area { border: 1px dashed var(--border); border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 14px; }
+        .upload-area:hover { border-color: var(--green); background: var(--green-dim); }
+        .upload-area input { display: none; }
+        .upload-icon { font-size: 28px; margin-bottom: 8px; }
+        .upload-text { font-size: 11px; color: var(--text-dim); }
+        .upload-name { font-size: 11px; color: var(--green); margin-top: 6px; }
+        .btn { width: 100%; padding: 14px; background: var(--green-dim); border: 1px solid var(--border-strong); color: var(--green); font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .btn:hover { background: rgba(0,255,136,0.2); box-shadow: 0 0 20px var(--green-glow); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-wpp { width: 100%; padding: 14px; background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.4); color: #25d366; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; border-radius: 6px; cursor: pointer; transition: all 0.2s; text-decoration: none; display: block; text-align: center; margin-top: 10px; }
+        .btn-wpp:hover { background: rgba(37,211,102,0.2); }
+        .msg-ok { background: rgba(0,255,136,0.08); border: 1px solid var(--border-strong); border-radius: 8px; padding: 16px; text-align: center; font-size: 12px; color: var(--green); margin-bottom: 16px; line-height: 1.6; }
+        .msg-pendente { background: rgba(0,204,255,0.06); border: 1px solid rgba(0,204,255,0.3); border-radius: 8px; padding: 14px; text-align: center; font-size: 11px; color: var(--cyan); margin-bottom: 16px; }
+        .err { color: var(--red); font-size: 11px; text-align: center; margin-top: 10px; min-height: 16px; }
+        .logout-link { text-align: center; margin-top: 20px; font-size: 10px; }
+        .logout-link a { color: var(--text-dim); text-decoration: none; }
+        .logout-link a:hover { color: var(--red); }
+        .copied { color: var(--green); font-size: 10px; text-align: center; margin-top: 6px; opacity: 0; transition: opacity 0.3s; }
+        .copied.show { opacity: 1; }
+    </style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div class="vignette"></div>
+<div class="noise"></div>
+<div class="scanline"></div>
+
+<div class="card">
+    <div class="logo">KENJI</div>
+    <div class="sub">ATIVAR ACESSO // R$ {{ valor }}/mês</div>
+
+    {% if tem_pag_pendente %}
+    <div class="msg-pendente">
+        ⏳ Comprovante enviado e aguardando aprovação.<br>
+        Você será liberado em breve.
+    </div>
+    {% endif %}
+
+    <div class="pix-box">
+        <div class="pix-title">> Pagamento via PIX</div>
+        <div class="pix-valor">R$ {{ valor }}</div>
+        <div class="pix-periodo">Acesso por 60 dias</div>
+        <div class="pix-chave-label">Chave PIX (clique para copiar):</div>
+        <div class="pix-chave" onclick="copiarChave()">{{ chave_pix }}</div>
+        <div class="copied" id="copied">✓ Copiado!</div>
+        <div class="copy-hint">> Copie a chave, pague no seu banco e envie o comprovante abaixo</div>
+    </div>
+
+    <div id="form-envio">
+        <label class="upload-label">Comprovante de pagamento</label>
+        <div class="upload-area" onclick="document.getElementById('arq').click()">
+            <input type="file" id="arq" accept="image/*" onchange="selecionou()">
+            <div class="upload-icon">📎</div>
+            <div class="upload-text">Toque para selecionar imagem</div>
+            <div class="upload-name" id="nome-arq"></div>
+        </div>
+        <button class="btn" id="btn-enviar" onclick="enviar()">[ ENVIAR COMPROVANTE ]</button>
+        <div class="err" id="err"></div>
+    </div>
+
+    <div id="pos-envio" style="display:none">
+        <div class="msg-ok">
+            ✅ Comprovante recebido!<br>
+            Avise o admin pelo WhatsApp para agilizar a aprovação.
+        </div>
+        <a class="btn-wpp" id="link-wpp" href="#" target="_blank">[ AVISAR NO WHATSAPP ]</a>
+    </div>
+
+    <div class="logout-link"><a href="/logout">sair da conta</a></div>
+</div>
+
+<script>
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let W, H, particles = [];
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+function initParticles() { particles = []; for(let i=0;i<60;i++) particles.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-0.5)*0.3,vy:(Math.random()-0.5)*0.3,size:Math.random()*1.5+0.5,alpha:Math.random()*0.4+0.1}); }
+function draw() { ctx.clearRect(0,0,W,H); particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; if(p.x<0)p.x=W; if(p.x>W)p.x=0; if(p.y<0)p.y=H; if(p.y>H)p.y=0; ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fillStyle=`rgba(0,255,136,${p.alpha})`; ctx.fill(); }); requestAnimationFrame(draw); }
+resize(); initParticles(); draw();
+window.addEventListener('resize', ()=>{ resize(); initParticles(); });
+
+function copiarChave() {
+    navigator.clipboard.writeText('{{ chave_pix }}').then(() => {
+        const el = document.getElementById('copied');
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 2000);
+    });
+}
+
+function selecionou() {
+    const arq = document.getElementById('arq').files[0];
+    document.getElementById('nome-arq').textContent = arq ? arq.name : '';
+}
+
+async function enviar() {
+    const arq = document.getElementById('arq').files[0];
+    const err = document.getElementById('err');
+    const btn = document.getElementById('btn-enviar');
+    if (!arq) { err.textContent = '> Selecione um comprovante'; return; }
+    btn.disabled = true; btn.textContent = '[ ENVIANDO... ]'; err.textContent = '';
+    try {
+        const form = new FormData();
+        form.append('comprovante', arq);
+        const r = await fetch('/enviar_comprovante', { method:'POST', body: form });
+        const d = await r.json();
+        if (d.erro) { err.textContent = '> ' + d.erro; }
+        else {
+            document.getElementById('form-envio').style.display = 'none';
+            document.getElementById('pos-envio').style.display = 'block';
+            document.getElementById('link-wpp').href = d.whatsapp_url;
+        }
+    } catch { err.textContent = '> Erro ao enviar. Tente novamente.'; }
+    finally { btn.disabled = false; btn.textContent = '[ ENVIAR COMPROVANTE ]'; }
+}
+</script>
+</body>
+</html>
