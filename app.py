@@ -37,7 +37,6 @@ app.config["SESSION_COOKIE_SAMESITE"]   = "Lax"
 app.config["MAX_CONTENT_LENGTH"]        = 10 * 1024 * 1024
 
 # ── Configurações ─────────────────────────────────────────────────────────────
-# CORREÇÃO DA URL: Ajusta prefixos para garantir compatibilidade com o SQLAlchemy/Psycopg2
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -77,8 +76,12 @@ def is_rate_limited(key: str, max_calls: int = 30, window: int = 60) -> bool:
 # ── Banco de dados (PostgreSQL) ───────────────────────────────────────────────
 def get_db():
     if "db" not in g:
-        # Usa a DATABASE_URL já corrigida para evitar erros de driver
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        conn = psycopg2.connect(
+            DATABASE_URL,
+            cursor_factory=psycopg2.extras.RealDictCursor,
+            connect_timeout=10,
+            sslmode="require",
+        )
         g.db = conn
     return g.db
 
@@ -106,11 +109,14 @@ def init_db():
     if not DATABASE_URL:
         log.error("DATABASE_URL não configurada!")
         return
-    
-    conn = psycopg2.connect(DATABASE_URL)
+
+    conn = psycopg2.connect(
+        DATABASE_URL,
+        connect_timeout=10,
+        sslmode="require",
+    )
     conn.autocommit = True
     cur = conn.cursor()
-    # Cria as tabelas necessárias se o banco estiver vazio
     cur.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
             id            TEXT PRIMARY KEY,
